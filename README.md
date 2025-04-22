@@ -1,0 +1,2 @@
+# ecosim
+An economy simulator
