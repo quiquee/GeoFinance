@@ -1,29 +1,25 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from models import (
     Base,
     AgentType,
     Agent,
     Ledger,
     LedgerAccount,
-    AccountType,
-    LedgerLogic,
+    AccountTypeEnum,
+    TransactionType,  # Correct model name
+    engine,
+    SessionLocal,
 )
 
-DATABASE_URL = "sqlite:///ecosim.db"
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+DATABASE_URL = "sqlite:///ecosimv2.db"  # Changed filename
 
 
 def create_db_structure():
     """Creates the database tables based on the defined models.
     Deletes all existing tables first to ensure a clean structure."""
     print("Dropping existing tables (if any)...")
-    Base.metadata.drop_all(bind=engine)  # Delete all tables defined in Base metadata
+    Base.metadata.drop_all(bind=engine)
     print("Creating new database structure...")
-    Base.metadata.create_all(bind=engine)  # Create tables
+    Base.metadata.create_all(bind=engine)
     print("Database structure created.")
 
 
@@ -31,166 +27,231 @@ def seed_initial_data():
     """Seeds the database with initial data as per README."""
     db = SessionLocal()
     try:
-        # Basic agent_types
+        # Basic agent_types (IDs adjusted to match README)
         if not db.query(AgentType).count():
             individual = AgentType(
                 id=1, name="individual", description="a basic individual"
             )
             shop = AgentType(id=2, name="shop", description="a retailer")
-            bank = AgentType(id=3, name="bank", description="a financial institution")
-            public_entity = AgentType(
-                id=4, name="public_entity", description="a government body"
+            bank = AgentType(id=3, name="bank", description="commercial bank")
+            central_bank = AgentType(
+                id=4, name="central_bank", description="a central bank"
             )
             producer = AgentType(
                 id=5, name="producer", description="a producer of goods and services"
             )
-            db.add_all([individual, shop, bank, public_entity, producer])
+            public = AgentType(id=6, name="public", description="a public entity")
+            realisedrisk = AgentType(
+                id=7, name="realisedrisk", description="sometimes things happen"
+            )
+
+            db.add_all(
+                [individual, shop, bank, central_bank, producer, public, realisedrisk]
+            )
             db.commit()
             print("Added basic agent types.")
         else:
+            # Fetch existing types if needed for agent creation
             individual = db.query(AgentType).filter_by(id=1).first()
             shop = db.query(AgentType).filter_by(id=2).first()
             bank = db.query(AgentType).filter_by(id=3).first()
-            public_entity = db.query(AgentType).filter_by(id=4).first()
-            producer = db.query(AgentType).filter_by(id=5).first()  # Fetch the new type
+            producer = db.query(AgentType).filter_by(id=5).first()
+            public = db.query(AgentType).filter_by(id=6).first()
+            realisedrisk = db.query(AgentType).filter_by(id=7).first()
 
-        # Basic agents and ledgers
+        # Basic agents and ledgers (IDs and names adjusted to match README)
         if not db.query(Agent).count():
             agent1 = Agent(
                 id=1,
-                name="enrique",
+                name="Enrique",
                 agent_type_id=individual.id,
                 description="a smart consumer",
             )
             agent2 = Agent(
                 id=2,
-                name="amazon",
+                name="Amazon",
                 agent_type_id=shop.id,
                 description="a big online retailer",
             )
             agent3 = Agent(
                 id=3,
-                name="hsbc",
-                agent_type_id=bank.id,
-                description="a global bank",
+                name="AEAT",
+                agent_type_id=public.id,
+                description="agencia estatal de la administracion tributaria",
             )
             agent4 = Agent(
                 id=4,
-                name="agencia tributaria",
-                agent_type_id=public_entity.id,
-                description="the spanish tax agency",
-            )
-            agent5 = Agent(  # New agent
-                id=5,
-                name="chinese factory",
+                name="ChinHuan",
                 agent_type_id=producer.id,
-                description="a large scale producer",
+                description="a chinese factory",
             )
-            db.add_all([agent1, agent2, agent3, agent4, agent5])  # Add agent5
-            db.commit()  # Commit agents first to get their IDs
+            agent5 = Agent(
+                id=5, name="HSBC", agent_type_id=bank.id, description="a global bank"
+            )
+            agent6 = Agent(
+                id=6, name="TheAbyss", agent_type_id=realisedrisk.id, description=""
+            )
+            agent7 = Agent(
+                id=7, name="Insurer", agent_type_id=realisedrisk.id, description=""
+            )
 
-            ledger1 = Ledger(agent_id=agent1.id)
-            ledger2 = Ledger(agent_id=agent2.id)
-            ledger3 = Ledger(agent_id=agent3.id)
-            ledger4 = Ledger(agent_id=agent4.id)
-            ledger5 = Ledger(agent_id=agent5.id)  # New ledger
-            db.add_all([ledger1, ledger2, ledger3, ledger4, ledger5])  # Add ledger5
-            db.commit()
+            db.add_all([agent1, agent2, agent3, agent4, agent5, agent6, agent7])
+            db.flush()  # Use flush instead of commit to keep transaction open
+
+            # Create ledgers for each agent
+            ledgers = [
+                Ledger(agent_id=agent.id)
+                for agent in [agent1, agent2, agent3, agent4, agent5, agent6, agent7]
+            ]
+            db.add_all(ledgers)
+            db.commit()  # Commit agents and ledgers together
             print("Added basic agents and ledgers.")
+        else:
+            pass
 
-        # Basic ledger accounts
+        # Basic ledger accounts (IDs and names adjusted to match README)
         if not db.query(LedgerAccount).count():
-            acc1 = LedgerAccount(
-                id=1,
-                name="merchandises",
-                type=AccountType.balance_sheet,
+            acc_merch = LedgerAccount(
+                id=1, name="merchandises", type=AccountTypeEnum.balance_sheet
             )
-            acc2 = LedgerAccount(
-                id=2,
-                name="banks",
-                type=AccountType.balance_sheet,
+            acc_banks = LedgerAccount(
+                id=2, name="banks", type=AccountTypeEnum.balance_sheet
             )
-            acc3 = LedgerAccount(
-                id=3,
-                name="creditors",
-                type=AccountType.balance_sheet,
+            acc_creditors = LedgerAccount(
+                id=3, name="creditors", type=AccountTypeEnum.balance_sheet
             )
-            acc4 = LedgerAccount(
-                id=4,
-                name="debitors",
-                type=AccountType.balance_sheet,
+            acc_debitors = LedgerAccount(
+                id=4, name="debitors", type=AccountTypeEnum.balance_sheet
             )
-            acc5 = LedgerAccount(
-                id=5,
-                name="sales",
-                type=AccountType.profit_loss,
+            acc_sales = LedgerAccount(
+                id=5, name="sales", type=AccountTypeEnum.profit_loss
             )
-            acc6 = LedgerAccount(
-                id=6,
-                name="expenses",
-                type=AccountType.profit_loss,
+            acc_expenses = LedgerAccount(
+                id=6, name="expenses", type=AccountTypeEnum.profit_loss
             )
-            db.add_all([acc1, acc2, acc3, acc4, acc5, acc6])
+            acc_income = LedgerAccount(
+                id=7, name="income", type=AccountTypeEnum.profit_loss
+            )
+            acc_unwanted = LedgerAccount(
+                id=8, name="unwanted", type=AccountTypeEnum.off_balance_sheet
+            )
+
+            db.add_all(
+                [
+                    acc_merch,
+                    acc_banks,
+                    acc_creditors,
+                    acc_debitors,
+                    acc_sales,
+                    acc_expenses,
+                    acc_income,
+                    acc_unwanted,
+                ]
+            )
             db.commit()
             print("Added basic ledger accounts.")
         else:
-            # Fetch accounts if they exist for logic seeding
-            acc1 = db.query(LedgerAccount).filter_by(id=1).first()
-            acc2 = db.query(LedgerAccount).filter_by(id=2).first()
-            acc3 = db.query(LedgerAccount).filter_by(id=3).first()
-            acc4 = db.query(LedgerAccount).filter_by(id=4).first()
-            acc5 = db.query(LedgerAccount).filter_by(id=5).first()
-            acc6 = db.query(LedgerAccount).filter_by(id=6).first()
+            acc_merch = db.query(LedgerAccount).filter_by(name="merchandises").first()
+            acc_banks = db.query(LedgerAccount).filter_by(name="banks").first()
+            acc_creditors = db.query(LedgerAccount).filter_by(name="creditors").first()
+            acc_debitors = db.query(LedgerAccount).filter_by(name="debitors").first()
+            acc_sales = db.query(LedgerAccount).filter_by(name="sales").first()
+            acc_expenses = db.query(LedgerAccount).filter_by(name="expenses").first()
+            acc_income = db.query(LedgerAccount).filter_by(name="income").first()
+            acc_unwanted = db.query(LedgerAccount).filter_by(name="unwanted").first()
 
-        # Basic ledger_logic instances
-        # Note: README links logic to accounts directly, not specific events yet.
-        # Mapping based on common accounting principles for the names given.
-        if not db.query(LedgerLogic).count():
-            # Assuming 'purchase' increases merchandise (debit) and increases creditors (credit)
-            # README says cr_account: merchandises, dt_account: creditors - this seems reversed for standard accounting.
-            # Sticking to README for now, but this might need review.
-            logic1 = LedgerLogic(
+        # Basic transaction_types (Using TransactionType model)
+        if not db.query(TransactionType).count():
+            if not all(
+                [
+                    acc_merch,
+                    acc_banks,
+                    acc_creditors,
+                    acc_debitors,
+                    acc_sales,
+                    acc_expenses,
+                    acc_income,
+                    acc_unwanted,
+                ]
+            ):
+                raise Exception(
+                    "One or more required ledger accounts not found during seeding."
+                )
+
+            tt1 = TransactionType(
                 id=1,
-                name="purchase",
-                description="Purchase event logic",
-                cr_account_id=acc1.id,  # merchandises
-                dt_account_id=acc3.id,  # creditors
+                name="buy",
+                dt_account_id=acc_merch.id,
+                cr_account_id=acc_creditors.id,
+                function_name="buy",
             )
-
-            # Assuming 'payment' decreases bank (credit) and decreases creditors (debit)
-            # README says dt_account: banks, cr_account: suppliers (creditors) - seems reversed.
-            # Using 'creditors' (id=3) as 'suppliers' isn't defined.
-            logic2 = LedgerLogic(
+            tt2 = TransactionType(
                 id=2,
-                name="payment",
-                description="Payment event logic",
-                dt_account_id=acc2.id,  # banks
-                cr_account_id=acc3.id,  # creditors
+                name="pay",
+                dt_account_id=acc_creditors.id,
+                cr_account_id=acc_banks.id,
+                function_name="pay",
             )
-
-            # Assuming 'sale' increases debtors (debit) and increases sales (credit)
-            # README says dt_account: clients (debitors), cr_account: sales
-            # Using 'debitors' (id=4) as 'clients' isn't defined.
-            logic3 = LedgerLogic(
+            tt3 = TransactionType(
                 id=3,
-                name="sale",
-                description="Sale event logic",
-                dt_account_id=acc4.id,  # debitors
-                cr_account_id=acc5.id,  # sales
+                name="sell",
+                dt_account_id=acc_debitors.id,
+                cr_account_id=acc_sales.id,
+                function_name="sell",
             )
-
-            # Assuming 'receipt' increases bank (debit) and decreases debtors (credit)
-            logic4 = LedgerLogic(
+            tt4 = TransactionType(
                 id=4,
-                name="receipt",
-                description="Receipt event logic",
-                cr_account_id=acc2.id,  # banks
-                dt_account_id=acc4.id,  # debitors
+                name="borrow",
+                dt_account_id=acc_banks.id,
+                cr_account_id=acc_creditors.id,
+                function_name="borrow",
+            )
+            tt5 = TransactionType(
+                id=5,
+                name="lend",
+                dt_account_id=acc_debitors.id,
+                cr_account_id=acc_banks.id,
+                function_name="lend",
+            )
+            tt6 = TransactionType(
+                id=6,
+                name="receive",
+                dt_account_id=acc_banks.id,
+                cr_account_id=acc_debitors.id,
+                function_name="receive",
+            )
+            tt7 = TransactionType(
+                id=7,
+                name="interest_pay",
+                dt_account_id=acc_expenses.id,
+                cr_account_id=acc_banks.id,
+                function_name="interest_pay",
+            )
+            tt8 = TransactionType(
+                id=8,
+                name="interest_receive",
+                dt_account_id=acc_banks.id,
+                cr_account_id=acc_income.id,
+                function_name="interest_receive",
+            )
+            tt9 = TransactionType(
+                id=9,
+                name="unwanted_event",
+                dt_account_id=acc_expenses.id,
+                cr_account_id=acc_unwanted.id,
+                function_name="unwanted_event",
+            )
+            tt10 = TransactionType(
+                id=10,
+                name="wanted_event",
+                dt_account_id=acc_unwanted.id,
+                cr_account_id=acc_income.id,
+                function_name="wanted_event",
             )
 
-            db.add_all([logic1, logic2, logic3, logic4])
+            db.add_all([tt1, tt2, tt3, tt4, tt5, tt6, tt7, tt8, tt9, tt10])
             db.commit()
-            print("Added basic ledger logic.")
+            print("Added basic transaction types.")
 
         print("Initial data seeding complete (if tables were empty).")
 
@@ -206,3 +267,4 @@ if __name__ == "__main__":
     create_db_structure()
     print("\nSeeding initial data...")
     seed_initial_data()
+    print("\nSetup finished.")

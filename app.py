@@ -1,26 +1,20 @@
-from flask import Flask, request, jsonify
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine, select
-
+from flask import Flask, request, jsonify, abort
 from models import (
     Base,
+    engine,
+    SessionLocal,
     Agent,
-    AgentType,
     Ledger,
-    LedgerAccount,
     LedgerEntry,
-    LedgerEvent,
-    LedgerLogic,
-    AccountType,
 )
-from db_setup import DATABASE_URL, SessionLocal, seed_initial_data, create_db_structure
 import economy_events
+import db_setup  # To potentially call setup functions if needed
 
 app = Flask(__name__)
 
 
-# Dependency to get DB session
-def get_db():
+# Dependency injector for DB session
+def get_db_session():
     db = SessionLocal()
     try:
         yield db
@@ -28,161 +22,180 @@ def get_db():
         db.close()
 
 
-@app.cli.command("init-db")
-def init_db_command():
-    """Creates the database tables and seeds initial data."""
-    print("Initializing the database...")
-    create_db_structure()
-    seed_initial_data()
-    print("Database initialized.")
+@app.route("/")
+def hello():
+    return "Welcome to Ecosim!"
 
 
-# --- Ledger Logic API ---
-
-
-@app.route("/ledger_logic", methods=["POST"])
-def create_ledger_logic():
-    """Creates a new ledger logic rule."""
-    data = request.get_json()
-    if not data or not all(
-        k in data for k in ("name", "cr_account_id", "dt_account_id")
-    ):
-        return jsonify(
-            {"error": "Missing required fields: name, cr_account_id, dt_account_id"}
-        ), 400
-
-    db = next(get_db())
+@app.route("/setup_database", methods=["POST"])
+def setup_database():
+    """
+    Endpoint to initialize the database structure and seed data.
+    Use with caution, as it drops existing tables.
+    """
     try:
-        # Check if accounts exist
-        cr_account = db.get(LedgerAccount, data["cr_account_id"])
-        dt_account = db.get(LedgerAccount, data["dt_account_id"])
-        if not cr_account or not dt_account:
-            return jsonify({"error": "Invalid cr_account_id or dt_account_id"}), 404
+        print("Setting up database via API call...")
+        db_setup.create_db_structure()
+        db_setup.seed_initial_data()
+        print("Database setup complete.")
+        return jsonify({"message": "Database created and seeded successfully."}), 200
+    except Exception as e:
+        print(f"Error during database setup: {e}")
+        return jsonify({"error": f"Database setup failed: {str(e)}"}), 500
 
-        new_logic = LedgerLogic(
-            name=data["name"],
-            description=data.get("description"),
-            cr_account_id=data["cr_account_id"],
-            dt_account_id=data["dt_account_id"],
-            ledger_event_id=data.get("ledger_event_id"),  # Optional link
-            function=data.get("function"),  # Optional
+
+@app.route("/event", methods=["POST"])
+def create_event():
+    """
+    Endpoint to trigger an economic event.
+    Expects JSON body with:
+    - event_type: str (e.g., "buy", "pay")
+    - description: str
+    - agent1_id: int
+    - agent2_id: int | None
+    - ccy: str (e.g., "USD")
+    - amount: float
+    - ccy2: str | None (optional)
+    - amount2: float | None (optional)
+    """
+    if not request.json:
+        abort(400, description="Request body must be JSON.")
+
+    data = request.json
+    required_fields = ["event_type", "description", "agent1_id", "ccy", "amount"]
+    if not all(field in data for field in required_fields):
+        abort(400, description=f"Missing required fields: {required_fields}")
+
+    event_type = data.get("event_type")
+    description = data.get("description")
+    agent1_id = data.get("agent1_id")
+    agent2_id = data.get("agent2_id")  # Can be None
+    ccy = data.get("ccy")
+    amount = data.get("amount")
+    ccy2 = data.get("ccy2")
+    amount2 = data.get("amount2")
+
+    # Validate data types (basic example)
+    if (
+        not isinstance(event_type, str)
+        or not isinstance(description, str)
+        or not isinstance(agent1_id, int)
+        or (agent2_id is not None and not isinstance(agent2_id, int))
+        or not isinstance(ccy, str)
+        or not isinstance(amount, (int, float))
+    ):
+        abort(400, description="Invalid data types in request.")
+
+    db_gen = get_db_session()
+    db = next(db_gen)
+    try:
+        event = economy_events.process_economic_event(
+            db=db,
+            event_type_name=event_type,
+            description=description,
+            agent1_id=agent1_id,
+            agent2_id=agent2_id,
+            ccy=ccy,
+            amount=float(amount),  # Ensure float
+            ccy2=ccy2,
+            amount2=float(amount2) if amount2 is not None else None,
         )
-        db.add(new_logic)
-        db.commit()
-        db.refresh(new_logic)
         return jsonify(
-            {"message": "Ledger logic created successfully", "id": new_logic.id}
+            {"message": "Event processed successfully", "event_id": event.id}
         ), 201
+    except ValueError as ve:
+        db.rollback()
+        abort(400, description=str(ve))
     except Exception as e:
         db.rollback()
-        return jsonify({"error": f"Failed to create ledger logic: {e}"}), 500
+        print(f"Error processing event: {e}")  # Log the error server-side
+        abort(500, description="An internal error occurred while processing the event.")
     finally:
-        db.close()
+        # Ensure db session is closed using the generator's finally block
+        try:
+            next(db_gen)  # This will trigger the finally block in get_db_session
+        except StopIteration:
+            pass  # Expected when generator finishes
 
 
-@app.route("/ledger_logic/event/<event_name>", methods=["GET"])
-def get_ledger_logic_by_event(event_name):
-    """Gets ledger logic rules associated with a specific event name."""
-    db = next(get_db())
+# --- Add more endpoints as needed ---
+# Example: Get agent details
+@app.route("/agent/<int:agent_id>", methods=["GET"])
+def get_agent(agent_id):
+    db_gen = get_db_session()
+    db = next(db_gen)
     try:
-        logics = db.query(LedgerLogic).filter(LedgerLogic.name == event_name).all()
-        if not logics:
-            return jsonify(
-                {"message": f"No ledger logic found for event: {event_name}"}
-            ), 404
+        agent = db.query(Agent).get(agent_id)
+        if not agent:
+            abort(404, description="Agent not found")
+        # Ensure ledger relationship is loaded or handled if None
+        ledger_id = agent.ledger.id if agent.ledger else None
+        return jsonify(
+            {
+                "id": agent.id,
+                "name": agent.name,
+                "description": agent.description,
+                "agent_type_id": agent.agent_type_id,
+                "ledger_id": ledger_id,
+            }
+        )
+    finally:
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
 
+
+# Example: Get ledger entries for an agent
+@app.route("/ledger/<int:ledger_id>/entries", methods=["GET"])
+def get_ledger_entries(ledger_id):
+    db_gen = get_db_session()
+    db = next(db_gen)
+    try:
+        # Check if ledger exists first
+        ledger = db.query(Ledger).filter_by(id=ledger_id).first()
+        if not ledger:
+            abort(404, description="Ledger not found")
+
+        entries = (
+            db.query(LedgerEntry)
+            .filter(LedgerEntry.ledger_id == ledger_id)
+            .order_by(LedgerEntry.datetime.desc())
+            .all()
+        )
         result = [
             {
-                "id": logic.id,
-                "name": logic.name,
-                "description": logic.description,
-                "cr_account_id": logic.cr_account_id,
-                "dt_account_id": logic.dt_account_id,
-                "ledger_event_id": logic.ledger_event_id,
-                "function": logic.function,
+                "id": entry.id,
+                "datetime": entry.datetime.isoformat(),
+                "event_id": entry.ledger_event_id,
+                "dt_account_id": entry.dt_account_id,
+                "cr_account_id": entry.cr_account_id,
+                "dt_ccy": entry.dt_ccy,
+                "dt_amount": entry.dt_amount,
+                "cr_ccy": entry.cr_ccy,
+                "cr_amount": entry.cr_amount,
             }
-            for logic in logics
+            for entry in entries
         ]
         return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": f"Failed to retrieve ledger logic: {e}"}), 500
     finally:
-        db.close()
-
-
-# --- Economy Event API ---
-
-
-@app.route("/event/<event_type>", methods=["POST"])
-def trigger_event(event_type):
-    """Triggers an economy event (e.g., payment, purchase, sale)."""
-    data = request.get_json()
-    required_fields = ["description", "agent_id", "ccy", "amount"]
-    if not data or not all(k in data for k in required_fields):
-        return jsonify({"error": f"Missing required fields: {required_fields}"}), 400
-
-    event_func = getattr(economy_events, event_type, None)
-    if not event_func or not callable(event_func):
-        return jsonify({"error": f"Invalid event type: {event_type}"}), 400
-
-    db = next(get_db())
-    try:
-        # Check if agent exists
-        agent = db.get(Agent, data["agent_id"])
-        if not agent:
-            return jsonify(
-                {"error": f"Agent with id {data['agent_id']} not found"}
-            ), 404
-
-        # Check optional agent2
-        agent2_id = data.get("agent2_id")
-        if agent2_id:
-            agent2 = db.get(Agent, agent2_id)
-            if not agent2:
-                return jsonify({"error": f"Agent2 with id {agent2_id} not found"}), 404
-
-        # Call the appropriate function from economy_events
-        result_event = event_func(
-            db_session=db,  # Pass the session
-            description=data["description"],
-            agent_id=data["agent_id"],
-            agent2_id=agent2_id,
-            ccy=data["ccy"],
-            ccy2=data.get("ccy2"),
-            amount=data["amount"],
-            amount2=data.get("amount2"),
-        )
-
-        if result_event:
-            # Note: economy_events now handles commit/rollback per event
-            return jsonify(
-                {
-                    "message": f"Event '{event_type}' processed successfully.",
-                    "event_id": result_event.id,
-                }
-            ), 201
-        else:
-            # Error message should have been printed by economy_events
-            return jsonify(
-                {
-                    "error": f"Failed to process event '{event_type}'. Check logs for details."
-                }
-            ), 500
-
-    except Exception as e:
-        # Catch any unexpected errors here, although economy_events should handle DB errors
-        # db.rollback() # Rollback might have already happened in economy_events
-        return jsonify({"error": f"An unexpected error occurred: {e}"}), 500
-    # finally:
-    # db session is closed by the context manager in economy_events or here if exception before call
-    # db.close() # Already handled by get_db context manager
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
 
 
 if __name__ == "__main__":
-    # Note: Use 'flask run' to start the server after setting FLASK_APP=app.py
-    # Use 'flask init-db' to setup the database first.
-    print("To run the application:")
-    print("1. Set FLASK_APP=app.py (export FLASK_APP=app.py or set FLASK_APP=app.py)")
-    print("2. Run 'flask init-db' to create and seed the database.")
-    print("3. Run 'flask run' to start the development server.")
-    # app.run(debug=True) # Avoid running directly like this for production/standard dev
+    # Ensure the DB exists before running the app
+    # You might want a more robust check or separate setup script execution
+    try:
+        # Check if tables exist, create if not. Avoids dropping data on every run.
+        # This requires inspecting the engine, a simpler approach for dev is just create_all
+        Base.metadata.create_all(bind=engine)  # Create tables if they don't exist
+        print("Database tables checked/created.")
+        # Optionally run seeding if DB was just created or specific tables are empty
+        # db_setup.seed_initial_data() # Be careful with re-seeding
+    except Exception as e:
+        print(f"Error checking/creating database tables: {e}")
+
+    app.run(debug=True)  # Runs on http://127.0.0.1:5000 by default

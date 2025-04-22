@@ -1,202 +1,283 @@
-from models import LedgerEvent, LedgerEntry, LedgerLogic, Ledger
 import datetime
+from sqlalchemy.orm import Session
+from models import (
+    LedgerEvent,
+    LedgerEntry,
+    TransactionType,
+    Agent,
+)
 
-# Define the mapping for mirror events
-MIRROR_EVENT_MAP = {
-    "purchase": "sale",
-    "sale": "purchase",
-    "payment": "receipt",  # Example: payment from agent1 is a receipt for agent2
-    "receipt": "payment",  # Example: receipt for agent1 is a payment from agent2
-    # Add other necessary mappings, ensure corresponding LedgerLogic exists
+# Define mirror transaction relationships
+MIRROR_TRANSACTIONS = {
+    "buy": "sell",
+    "sell": "buy",
+    "borrow": "lend",
+    "lend": "borrow",
+    "pay": "receive",
+    "receive": "pay",
+    "interest_pay": "interest_receive",
+    "interest_receive": "interest_pay",
+    "unwanted_event": "wanted_event",
+    "wanted_event": "unwanted_event",
 }
 
 
-def create_ledger_entry(
-    db_session, event_name, description, agent_id, agent2_id, ccy, ccy2, amount, amount2
+def _create_ledger_entry(
+    db: Session,
+    ledger_id: int,
+    event_id: int,
+    transaction_type: TransactionType,
+    amount: float,
+    ccy: str,
+    is_mirror: bool = False,
 ):
-    """Handles an economic event: records the event and creates ledger entries based on logic, including mirror entries for agent2."""
+    """Helper function to create a single ledger entry."""
+    # Swap debit/credit for mirror transactions based on the *mirror* transaction type's definition
+    # The original logic incorrectly swapped based on the *original* transaction type
+    dt_account_id = transaction_type.dt_account_id
+    cr_account_id = transaction_type.cr_account_id
 
-    # 1. Record the LedgerEvent (common to both agents)
-    event_datetime = datetime.datetime.now(
-        datetime.timezone.utc
-    )  # Use a single timestamp
-    new_event = LedgerEvent(
-        name=event_name,
+    entry = LedgerEntry(
+        datetime=datetime.datetime.now(datetime.timezone.utc),
+        ledger_id=ledger_id,
+        ledger_event_id=event_id,
+        dt_ccy=ccy,
+        dt_amount=amount,
+        cr_ccy=ccy,
+        cr_amount=amount,
+        dt_account_id=dt_account_id,
+        cr_account_id=cr_account_id,
+    )
+    db.add(entry)
+
+
+def process_economic_event(
+    db: Session,
+    event_type_name: str,
+    description: str,
+    agent1_id: int,
+    agent2_id: int | None,
+    ccy: str,
+    amount: float,
+    ccy2: str | None = None,
+    amount2: float | None = None,
+):
+    """
+    Processes an economic event, creates the LedgerEvent,
+    and generates corresponding LedgerEntry records for involved agents.
+    """
+    # 1. Find the TransactionType for the primary event
+    transaction_type = db.query(TransactionType).filter_by(name=event_type_name).first()
+    if not transaction_type:
+        raise ValueError(f"Transaction type '{event_type_name}' not found.")
+
+    # 2. Create the LedgerEvent
+    event = LedgerEvent(
+        transaction_type_id=transaction_type.id,
+        name=description,  # Using description as event name for now
         description=description,
-        agent_id=agent_id,
+        agent1_id=agent1_id,
         agent2_id=agent2_id,
         ccy=ccy,
-        ccy2=ccy2,
         amount=amount,
+        ccy2=ccy2,
         amount2=amount2,
-        datetime=event_datetime,
     )
-    db_session.add(new_event)
-    # Flush might be needed if LedgerEntry needs the event ID before commit
-    # db_session.flush()
-    print(
-        f"Recorded LedgerEvent: {event_name} involving agent {agent_id}"
-        + (f" and agent {agent2_id}" if agent2_id else "")
+    db.add(event)
+    db.flush()  # Flush to get the event ID
+
+    # 3. Create LedgerEntry for Agent 1
+    agent1 = db.query(Agent).get(agent1_id)
+    if not agent1 or not agent1.ledger:
+        db.rollback()  # Rollback event creation if agent/ledger missing
+        raise ValueError(f"Agent 1 (ID: {agent1_id}) or their ledger not found.")
+
+    _create_ledger_entry(
+        db=db,
+        ledger_id=agent1.ledger.id,
+        event_id=event.id,
+        transaction_type=transaction_type,  # Use primary transaction type for agent 1
+        amount=amount,
+        ccy=ccy,
+        is_mirror=False,  # Not a mirror entry
     )
 
-    entries_to_add = []  # Collect entries to add together
-
-    # --- Process entry for agent_id ---
-    logic = db_session.query(LedgerLogic).filter_by(name=event_name).first()
-    if not logic:
-        print(
-            f"Error: No LedgerLogic found for event name '{event_name}'. Rolling back."
+    # 4. Handle Mirror Transaction for Agent 2 (if applicable)
+    mirror_event_name = MIRROR_TRANSACTIONS.get(event_type_name)
+    if agent2_id and mirror_event_name:
+        mirror_transaction_type = (
+            db.query(TransactionType).filter_by(name=mirror_event_name).first()
         )
-        db_session.rollback()  # Rollback event creation
-        return None
-
-    agent_ledger = db_session.query(Ledger).filter_by(agent_id=agent_id).first()
-    if not agent_ledger:
-        print(f"Error: No Ledger found for agent ID '{agent_id}'. Rolling back.")
-        db_session.rollback()  # Rollback event creation
-        return None
-
-    # Determine amounts and currencies for agent1's entry
-    # Assuming primary amount/ccy for now. Refine if needed.
-    dt_amount_agent1 = amount
-    cr_amount_agent1 = amount
-    dt_ccy_agent1 = ccy
-    cr_ccy_agent1 = ccy
-
-    ledger_entry_agent1 = LedgerEntry(
-        datetime=event_datetime,
-        currency=dt_ccy_agent1,  # Base currency for the entry
-        ledger_id=agent_ledger.id,
-        dt_ccy=dt_ccy_agent1,
-        dt_amount=dt_amount_agent1,
-        cr_ccy=cr_ccy_agent1,
-        cr_amount=cr_amount_agent1,
-        dt_account_id=logic.dt_account_id,
-        cr_account_id=logic.cr_account_id,
-        # ledger_event_id=new_event.id # Optional: link entry to event after flush
-    )
-    entries_to_add.append(ledger_entry_agent1)
-    print(
-        f"Prepared LedgerEntry for agent {agent_id}: DtAcc={logic.dt_account_id}, CrAcc={logic.cr_account_id}, Amount={dt_amount_agent1} {dt_ccy_agent1}"
-    )
-
-    # --- Process mirror entry for agent2_id if applicable ---
-    if agent2_id:
-        mirror_event_name = MIRROR_EVENT_MAP.get(event_name)
-        if not mirror_event_name:
-            # If no mirror is defined, we only create the first entry.
-            # Commit handled later.
+        if not mirror_transaction_type:
+            # Don't rollback, just warn. The primary transaction is still valid.
             print(
-                f"Warning: No mirror event mapping found for '{event_name}'. Only creating entry for agent {agent_id}."
+                f"Warning: Mirror transaction type '{mirror_event_name}' not found for event '{event_type_name}'. Skipping mirror entry."
             )
         else:
-            print(
-                f"Processing mirror event '{mirror_event_name}' for agent {agent2_id}"
-            )
-
-            mirror_logic = (
-                db_session.query(LedgerLogic).filter_by(name=mirror_event_name).first()
-            )
-            if not mirror_logic:
+            agent2 = db.query(Agent).get(agent2_id)
+            if not agent2 or not agent2.ledger:
+                # Don't rollback, just warn.
                 print(
-                    f"Error: No LedgerLogic found for mirror event name '{mirror_event_name}'. Rolling back."
+                    f"Warning: Agent 2 (ID: {agent2_id}) or their ledger not found. Skipping mirror entry."
                 )
-                db_session.rollback()  # Rollback event and agent1 entry prep
-                return None
+            else:
+                # Determine amount/ccy for mirror entry (simple case: use primary amount/ccy)
+                mirror_amount = amount
+                mirror_ccy = ccy
+                if amount2 is not None and ccy2 is not None:
+                    # Potentially use amount2/ccy2 if relevant for the mirror side,
+                    # requires more specific logic per transaction type if amounts differ.
+                    # For now, we assume the primary amount applies to both sides.
+                    pass
 
-            agent2_ledger = (
-                db_session.query(Ledger).filter_by(agent_id=agent2_id).first()
-            )
-            if not agent2_ledger:
-                print(
-                    f"Error: No Ledger found for agent ID '{agent2_id}'. Rolling back."
+                _create_ledger_entry(
+                    db=db,
+                    ledger_id=agent2.ledger.id,
+                    event_id=event.id,  # Link mirror entry to the same event
+                    transaction_type=mirror_transaction_type,  # Use the MIRROR transaction type
+                    amount=mirror_amount,
+                    ccy=mirror_ccy,
+                    is_mirror=True,  # Indicate this is a mirror entry (used by helper if needed, but logic now uses mirror_transaction_type)
                 )
-                db_session.rollback()  # Rollback event and agent1 entry prep
-                return None
 
-            # Determine amounts and currencies for agent2's entry
-            # ASSUMPTION: Using primary amount/ccy for mirror entry as well.
-            # Adjust this logic if amount2/ccy2 or different amounts are needed for the mirror.
-            dt_amount_agent2 = amount
-            cr_amount_agent2 = amount
-            dt_ccy_agent2 = ccy
-            cr_ccy_agent2 = ccy
-
-            ledger_entry_agent2 = LedgerEntry(
-                datetime=event_datetime,
-                currency=dt_ccy_agent2,  # Base currency for the entry
-                ledger_id=agent2_ledger.id,
-                dt_ccy=dt_ccy_agent2,
-                dt_amount=dt_amount_agent2,
-                cr_ccy=cr_ccy_agent2,
-                cr_amount=cr_amount_agent2,
-                dt_account_id=mirror_logic.dt_account_id,
-                cr_account_id=mirror_logic.cr_account_id,
-                # ledger_event_id=new_event.id # Optional: link entry to event after flush
-            )
-            entries_to_add.append(ledger_entry_agent2)
-            print(
-                f"Prepared LedgerEntry for agent {agent2_id}: DtAcc={mirror_logic.dt_account_id}, CrAcc={mirror_logic.cr_account_id}, Amount={dt_amount_agent2} {dt_ccy_agent2}"
-            )
-
-    # Add all prepared entries and commit transactionally
-    if entries_to_add:
-        db_session.add_all(entries_to_add)
-        try:
-            db_session.commit()
-            print(
-                f"Successfully processed event '{event_name}' and committed {len(entries_to_add)} entries."
-            )
-            return new_event  # Return the created event
-        except Exception as e:
-            db_session.rollback()
-            print(f"Error committing changes for event '{event_name}': {e}")
-            return None
-    else:
-        # This case should not be reached if agent1 processing was successful
-        # but added for safety. Rollback the event if no entries generated.
-        print(
-            f"Error: No ledger entries were prepared for event '{event_name}'. Rolling back event creation."
-        )
-        db_session.rollback()
-        return None
+    db.commit()
+    print(f"Processed event '{event_type_name}' (ID: {event.id}) successfully.")
+    return event
 
 
-# Define specific event functions as wrappers around the core logic
+# Example wrapper functions for specific events (optional, could be called from API)
 
 
-def payment(db_session, description, agent_id, agent2_id, ccy, ccy2, amount, amount2):
-    return create_ledger_entry(
-        db_session,
-        "payment",
-        description,
-        agent_id,
-        agent2_id,
-        ccy,
-        ccy2,
-        amount,
-        amount2,
+def buy(
+    db: Session,
+    description: str,
+    agent1_id: int,
+    agent2_id: int,
+    ccy: str,
+    amount: float,
+):
+    return process_economic_event(
+        db, "buy", description, agent1_id, agent2_id, ccy, amount
     )
 
 
-def purchase(db_session, description, agent_id, agent2_id, ccy, ccy2, amount, amount2):
-    return create_ledger_entry(
-        db_session,
-        "purchase",
-        description,
-        agent_id,
-        agent2_id,
-        ccy,
-        ccy2,
-        amount,
-        amount2,
+def pay(
+    db: Session,
+    description: str,
+    agent1_id: int,
+    agent2_id: int,
+    ccy: str,
+    amount: float,
+):
+    return process_economic_event(
+        db, "pay", description, agent1_id, agent2_id, ccy, amount
     )
 
 
-def sale(db_session, description, agent_id, agent2_id, ccy, ccy2, amount, amount2):
-    return create_ledger_entry(
-        db_session, "sale", description, agent_id, agent2_id, ccy, ccy2, amount, amount2
+def sell(
+    db: Session,
+    description: str,
+    agent1_id: int,
+    agent2_id: int,
+    ccy: str,
+    amount: float,
+):
+    return process_economic_event(
+        db, "sell", description, agent1_id, agent2_id, ccy, amount
     )
 
 
-# Example usage moved to test_events.py
+def borrow(
+    db: Session,
+    description: str,
+    agent1_id: int,
+    agent2_id: int,
+    ccy: str,
+    amount: float,
+):
+    return process_economic_event(
+        db, "borrow", description, agent1_id, agent2_id, ccy, amount
+    )
+
+
+def lend(
+    db: Session,
+    description: str,
+    agent1_id: int,
+    agent2_id: int,
+    ccy: str,
+    amount: float,
+):
+    return process_economic_event(
+        db, "lend", description, agent1_id, agent2_id, ccy, amount
+    )
+
+
+def receive(
+    db: Session,
+    description: str,
+    agent1_id: int,
+    agent2_id: int,
+    ccy: str,
+    amount: float,
+):
+    return process_economic_event(
+        db, "receive", description, agent1_id, agent2_id, ccy, amount
+    )
+
+
+def interest_pay(
+    db: Session,
+    description: str,
+    agent1_id: int,
+    agent2_id: int,
+    ccy: str,
+    amount: float,
+):
+    return process_economic_event(
+        db, "interest_pay", description, agent1_id, agent2_id, ccy, amount
+    )
+
+
+def interest_receive(
+    db: Session,
+    description: str,
+    agent1_id: int,
+    agent2_id: int,
+    ccy: str,
+    amount: float,
+):
+    return process_economic_event(
+        db, "interest_receive", description, agent1_id, agent2_id, ccy, amount
+    )
+
+
+def unwanted_event(
+    db: Session,
+    description: str,
+    agent1_id: int,
+    agent2_id: int | None,
+    ccy: str,
+    amount: float,
+):
+    # Agent 2 might not always apply here, depends on context
+    return process_economic_event(
+        db, "unwanted_event", description, agent1_id, agent2_id, ccy, amount
+    )
+
+
+def wanted_event(
+    db: Session,
+    description: str,
+    agent1_id: int,
+    agent2_id: int | None,
+    ccy: str,
+    amount: float,
+):
+    # Agent 2 might not always apply here, depends on context
+    return process_economic_event(
+        db, "wanted_event", description, agent1_id, agent2_id, ccy, amount
+    )
+
+
+# Add other event functions as needed following the pattern...
