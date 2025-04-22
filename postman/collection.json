@@ -1,0 +1,128 @@
+{
+    "info": {
+        "name": "ecosim",
+        "description": "API endpoints for the EcoSim application.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Ledger Logic",
+            "item": [
+                {
+                    "name": "Create Ledger Logic",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Example Payment Logic\",\n    \"description\": \"Logic for processing standard payments\",\n    \"cr_account_id\": 1, \n    \"dt_account_id\": 2, \n    \"ledger_event_id\": null, \n    \"function\": null \n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/ledger_logic",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "ledger_logic"
+                            ]
+                        },
+                        "description": "Creates a new ledger logic rule.\n\n**Required fields:** `name`, `cr_account_id`, `dt_account_id`\n**Optional fields:** `description`, `ledger_event_id`, `function`"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Ledger Logic by Event Name",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{baseUrl}}/ledger_logic/event/:event_name",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "ledger_logic",
+                                "event",
+                                ":event_name"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "event_name",
+                                    "value": "payment", 
+                                    "description": "The name of the event to filter logic rules by."
+                                }
+                            ]
+                        },
+                        "description": "Gets ledger logic rules associated with a specific event name."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Endpoints for managing ledger logic rules."
+        },
+        {
+            "name": "Economy Events",
+            "item": [
+                {
+                    "name": "Trigger Economy Event",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"description\": \"Payment for services rendered\",\n    \"agent_id\": 1, \n    \"agent2_id\": 2, \n    \"ccy\": \"USD\",\n    \"amount\": 100.50,\n    \"ccy2\": null,\n    \"amount2\": null\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/event/:event_type",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "event",
+                                ":event_type"
+                            ],
+                            "variable": [
+                                {
+                                    "key": "event_type",
+                                    "value": "payment", 
+                                    "description": "The type of economy event to trigger."
+                                }
+                            ]
+                        },
+                        "description": "Triggers an economy event (e.g., payment, purchase, sale).\n\n**Required fields:** `description`, `agent_id`, `ccy`, `amount`\n**Optional fields:** `agent2_id`, `ccy2`, `amount2`\n\nThe `:event_type` in the URL must correspond to a function name within the `economy_events.py` module."
+                    },
+                    "response": []
+                }
+            ],
+            "description": "Endpoints for triggering economy events."
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://127.0.0.1:5000",
+            "type": "string",
+            "description": "The base URL of the EcoSim API."
+        }
+    ]
+}
