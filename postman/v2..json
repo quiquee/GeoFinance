@@ -1,0 +1,160 @@
+{
+    "info": {
+        "_postman_id": "ecosim v2", 
+        "name": "Ecosim API v2",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+        "_exporter_id": "ecosim v2" 
+    },
+    "item": [
+        {
+            "name": "Welcome",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        ""
+                    ]
+                },
+                "description": "Simple welcome message."
+            },
+            "response": []
+        },
+        {
+            "name": "Setup Database",
+            "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/setup_database",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "setup_database"
+                    ]
+                },
+                "description": "Initializes the database structure and seeds data. Use with caution."
+            },
+            "response": []
+        },
+        {
+            "name": "Create Economic Event",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json",
+                        "type": "text"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"event_type\": \"buy\",\n    \"description\": \"Agent 1 buys goods from Agent 2\",\n    \"agent1_id\": 1,\n    \"agent2_id\": 2,\n    \"ccy\": \"USD\",\n    \"amount\": 100.50,\n    \"ccy2\": null, \n    \"amount2\": null\n}",
+                    "options": {
+                        "raw": {
+                            "language": "json"
+                        }
+                    }
+                },
+                "url": {
+                    "raw": "{{baseUrl}}/event",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "event"
+                    ]
+                },
+                "description": "Triggers an economic event. See endpoint docstring in `app.py` for required fields:\n- event_type: str (e.g., \"buy\", \"pay\")\n- description: str\n- agent1_id: int\n- agent2_id: int | None\n- ccy: str (e.g., \"USD\")\n- amount: float\n- ccy2: str | None (optional)\n- amount2: float | None (optional)"
+            },
+            "response": []
+        },
+        {
+            "name": "Get Agent Details",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/agent/:agent_id",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "agent",
+                        ":agent_id"
+                    ],
+                    "variable": [
+                        {
+                            "key": "agent_id",
+                            "value": "1",
+                            "description": "(Required) The ID of the agent to retrieve."
+                        }
+                    ]
+                },
+                "description": "Retrieves details for a specific agent by their ID."
+            },
+            "response": []
+        },
+        {
+            "name": "Get Ledger Entries",
+            "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                    "raw": "{{baseUrl}}/ledger/:ledger_id/entries",
+                    "host": [
+                        "{{baseUrl}}"
+                    ],
+                    "path": [
+                        "ledger",
+                        ":ledger_id",
+                        "entries"
+                    ],
+                    "variable": [
+                        {
+                            "key": "ledger_id",
+                            "value": "1",
+                            "description": "(Required) The ID of the ledger whose entries are to be retrieved."
+                        }
+                    ]
+                },
+                "description": "Retrieves all ledger entries associated with a specific ledger ID."
+            },
+            "response": []
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        },
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://127.0.0.1:5000",
+            "type": "default",
+            "description": "Base URL for the Ecosim API"
+        }
+    ]
+}

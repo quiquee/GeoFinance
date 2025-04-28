@@ -3,30 +3,69 @@ An economy simulator
 
 ## Requirements
 Create a python backend using flask that will allow to maintain a collection of accounting ledgers
-The data will be stored to a sqlite, using some method that would allow for easy portability to other databases, i.e. Postgress or others
+The data will be stored to a sqlite
+There is an API that allows to configure the system, modify records, add or delete
 
-### Create the database structure
-A separate utility allows to create the database sctructure on a blank database (sqllite to start with) 
-The database has the following tables and fields
-- agent_type: id, name, description
-- agent: id, agent_type_id, name, description
-- transaction_type: id, name, description, cr_account, dt_account, function
-- ledger: id, agent_id
-- ledger_account: id, name, type [profit_loss, balance_sheet, off_balance_sheet, fx_position]
-- ledger_entries: id, datetime, currency, ledger_id, dt_ccy, dt_amount, cr_ccy, cr_amount, dt_account_id, cr_account_id 
-- ledger_event: id, transaction_type_id, name, datetime, description, agent, agent2, ccy, ccy2, amount, amount2
+The database will store:
+Regions, Sectors, Agent Types, Agents, Ledgers, Economic Events, Accounting Rules, Accounts and Transactions
 
-### Create a module file: economy_events.py
-Contains economy_event functions that are called when economy events happen
-All functions have these parameters: description, agent, agent2, ccy, ccy2, amount, amount2
-All functions generate one or more ledger_events that are written inmediately to the table ledger_event using the parameters received and the name of the function
-Use the matching ledger_logic information for this function create the corresponding entries in the ledger_entries table
+## Main definitions
 
-### Interface to the ledger_logic table
-Store new ledger_logic records
-Allows reading the ledger_logic for a given economic_event
-Ledger event can be: payment, purchase, sale, borrow, payment, receipt, purchase_freezone, sale_freezone, purchase_import, sale_export,
+### Region
+Regions are systems where economic events happen
+There is a main region called "World" 
+A region that is not World is always a sub-region of another one
+For example: Asia is a sub-region of world, and China is a sub-region of Asia
 
+### Sector
+Sectors are like regions, where economic events may happen. 
+There is a main sector, called "Economy" 
+A sector that is not "Economy" is allways a sub-sector of another one
+For example: Electronics is a sub-sector of Economy and Chip Manufacturer is a a sub-sector of Electronics
+
+### Agent
+Agents always belong to a single Sector and to a single Region
+There is a special agent called "Chaos" that belongs to "Economy" sector and "World" region
+Agents have a type
+
+### EconomicAmount
+EconomicAmount is a numerical representation of value
+
+### Currency
+Currencies are units of measurement for EconomicAmounts
+
+### Wealth
+Wealth is an EconomicAmount that represents the wealth of an agent
+
+### Accounts
+Accounts are structured records that allow to assign a state at a given point in time to a financial information item. 
+Accounts are of three different types: balance sheet, profit and loss or off balance sheet
+Accounts may describe a Right or an Obligation (Balance Sheet Accounts) or a Source or Destination (Profit and Loss accounts). 
+
+### Ledger
+Ledger is a collection of accounts that belong to an agent. It has a state at every point in time, which is the collection of all the balances for each of the accounts of that agent at that point in time
+
+### Economic Events
+Economic events are those events that may happen in a region or in a sector at a given point in time between two agents
+Economic events have a probability of happening, a periodic frequency and a time decay specified in number of periods
+Ecomomic events have as well an EconomicAmount, a date and a time, a region, a sector and two agents involved
+For example:
+1. Pompeya EarthQuake: EconomicAmount is be the amount of Wealth destroyed by the Earth Quake in the Pompeya region that happened a given date. Agents are Chaos on one side and habitants of Pompeya in the other and sector is Economy
+1. Construction of Santiago Bernabeu: EconomicAmount is the value of the cost of building SantiagoBernabeu in the seventies. Region is Madrid, Sector is Football. Agents are a Construction Company and RealMadrid FC
+1. Payment of Santiago Bernabeu Building at a rate of 20% anually: a derived Economic Event of the previous one, transfering annually for an amount of 20% from the RealMadrid FC to the Construction Company
+
+### Accounting Rules
+Accounting Rule is the logic that defines the frequency, the source account and the destination account
+There might be one of more Accounting Rules linked to an economic event
+
+### Transactions
+Transactions are the economic representation of Economic Events. They are generated when the Economic Event happens and are created using the Accounting Rules linked to that Economic Event. The balance of the source account specified in the Accounting Rule is decreased by the EconomicAmount of the event and the balance of the destination account  is increased by the same amount 
+
+### Frequency
+A measure of time at which Economic Events happen
+It can be: Once, Daily, Weekly, Monthly, Quaterly, Annually
+
+## Starting Records in the System
 ### Basic agent_types
 Create agent types
 - 1 name: individual, description: a basic individual
@@ -56,28 +95,18 @@ Create the following accounts
 - 5 name: sales, type: profit_loss 
 - 6 name: expenses, type: profit_loss 
 - 7 name: income, type: profit_loss 
-- 8 name: unwanted, type: off_balance_sheet
 
-### Basic transaction_types
+### Basic Economic Events
 Create the following transaction_types:
-- 1 name: buy, cr_account: merchandises, dt_account: creditors
+- 1 name: purchase, cr_account: merchandises, dt_account: creditors
 - 2 name: pay, dt_account: banks, cr_account: suppliers
-- 3 name: sell, dt_account: clients, cr_account: sales
+- 3 name: sale, dt_account: clients, cr_account: sales
 - 4 name: borrow, dt_account: bank, dt_account: creditors
 - 5 name: lend, dt_account: debitors, cr_account: banks
-- 6 name: receive, dt_account: debitors, cr_account: banks
+- 6 name: receipt, dt_account: debitors, cr_account: banks
 - 7 name: interest_pay, dt_account: banks, cr_account: expenses
 - 8 name: interest_receive, cr_account: banks, dt_account: income
-- 9 name: unwanted_event, cr_account: unwanted, dt_account: expenses
-- 10 name: wanted_event, dt_account: unwanted, cr_account: income
 
 
-### Mirror transactions
-Every time that an economic event happens of a given type and if two agents are involved, then the second agent will record a transaction in her ledger using the mirror logic. The mirror logic is as follows:
-- purchase <-> sale
-- borrow <-> lend
-- pay <-> receive
-- interest_pay <-> interest_receive
-- unwanted_event <-> wanted_event
 
 
