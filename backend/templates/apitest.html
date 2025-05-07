@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>API Test Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 2em; }
+        .endpoint { border: 1px solid #ccc; padding: 1em; margin-bottom: 1em; }
+        .result { background: #f9f9f9; border: 1px solid #eee; margin-top: 0.5em; padding: 0.5em; }
+        label { display: block; margin-top: 0.5em; }
+        input, button { margin-top: 0.2em; }
+    </style>
+</head>
+<body>
+    <h1>API Test Page</h1>
+    <div id="endpoints"></div>
+    <script>
+    async function fetchEndpoints() {
+        const res = await fetch('/api/apitest/endpoints');
+        return res.json();
+    }
+
+    function createForm(endpoint) {
+        const form = document.createElement('form');
+        form.className = 'endpoint';
+        form.innerHTML = `<h2>${endpoint.name} [${endpoint.method}]</h2>`;
+        endpoint.fields.forEach(field => {
+            const label = document.createElement('label');
+            label.textContent = field.name + (field.required ? ' *' : '');
+            const input = document.createElement('input');
+            input.type = field.type || 'text';
+            input.name = field.name;
+            if (field.required) input.required = true;
+            label.appendChild(input);
+            form.appendChild(label);
+        });
+        const submit = document.createElement('button');
+        submit.type = 'submit';
+        submit.textContent = 'Test';
+        form.appendChild(submit);
+        const result = document.createElement('div');
+        result.className = 'result';
+        form.appendChild(result);
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            result.textContent = 'Loading...';
+            let url = endpoint.path;
+            let options = { method: endpoint.method, headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin' };
+            if (endpoint.method === 'GET') {
+                // Add query params for GET
+                const params = Array.from(form.elements).filter(el => el.name && el.value).map(el => `${encodeURIComponent(el.name)}=${encodeURIComponent(el.value)}`).join('&');
+                if (params) url += '?' + params;
+                delete options.headers['Content-Type'];
+            } else {
+                const data = {};
+                endpoint.fields.forEach(field => {
+                    data[field.name] = form.elements[field.name].value;
+                });
+                options.body = JSON.stringify(data);
+            }
+            try {
+                const resp = await fetch(url, options);
+                const text = await resp.text();
+                let json;
+                try { json = JSON.parse(text); } catch { json = text; }
+                result.textContent = `Status: ${resp.status}\n` + JSON.stringify(json, null, 2);
+            } catch (err) {
+                result.textContent = 'Error: ' + err;
+            }
+        };
+        return form;
+    }
+
+    async function main() {
+        const endpoints = await fetchEndpoints();
+        const container = document.getElementById('endpoints');
+        endpoints.forEach(endpoint => {
+            container.appendChild(createForm(endpoint));
+        });
+    }
+    main();
+    </script>
+</body>
+</html>

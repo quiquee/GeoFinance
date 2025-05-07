@@ -1,0 +1,55 @@
+from flask import Flask, send_from_directory, request, render_template
+import os
+from config import Config
+from models import db
+from routes.main import main_bp
+from routes.accounts_routes import accounts_bp  # For account operations
+from routes.journal_routes import journal_bp  # For journal operations
+from routes.ledger_routes import ledger_bp  # For ledger operations
+from routes.apitest_endpoints import apitest_bp
+
+# Define the path to the webapp directory relative to the backend directory
+webapp_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'webapp'))
+
+def create_app(config_class=Config):
+    # Configure static folder to point to the webapp directory
+    app = Flask(__name__, static_folder=webapp_dir, static_url_path='')
+    app.config.from_object(config_class)
+
+    db.init_app(app)
+
+    # Create database tables if they don't exist
+    with app.app_context():
+        db.create_all()
+
+    # Register the API blueprints
+    app.register_blueprint(main_bp, url_prefix='/api')
+    app.register_blueprint(accounts_bp, url_prefix='/api/ledger/accounts')  # Account CRUD operations
+    app.register_blueprint(journal_bp, url_prefix='/api/ledger/journal')  # Journal entry operations
+    app.register_blueprint(ledger_bp, url_prefix='/api/ledger')  # Ledger management & reports
+    app.register_blueprint(apitest_bp)  # Register apitest blueprint
+
+    # Route to serve the index.html from the webapp directory
+    @app.route('/')
+    def serve_index():
+        return send_from_directory(app.static_folder, 'index.html')
+
+    # Route to serve apitest.html from the templates directory
+    @app.route('/apitest')
+    def serve_apitest():
+        return render_template('apitest.html')
+
+    # Optional: Route to handle client-side routing (if you use a JS framework later)
+    @app.errorhandler(404)
+    def not_found(e):
+        # If the path doesn't match an API route or a static file, serve index.html
+        if not request.path.startswith('/api/'):
+            return send_from_directory(app.static_folder, 'index.html')
+        # Otherwise, it's a real 404 for an API endpoint
+        return e
+
+    return app
+
+if __name__ == '__main__':
+    app = create_app()
+    app.run(debug=True)
