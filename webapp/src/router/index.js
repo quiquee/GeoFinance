@@ -8,6 +8,7 @@ const Accounts = () => import('../views/Accounts.vue')
 const Journal = () => import('../views/Journal.vue')
 const Reports = () => import('../views/Reports.vue')
 const Login = () => import('../views/Login.vue')
+const CreateJournalEntry = () => import('../views/CreateJournalEntry.vue')
 
 const routes = [
   {
@@ -39,6 +40,14 @@ const routes = [
     path: '/journal',
     name: 'Journal',
     component: Journal,
+    meta: {
+      requiresAuth: true
+    }
+  },
+  {
+    path: '/journal/create',
+    name: 'CreateJournalEntry',
+    component: CreateJournalEntry,
     meta: {
       requiresAuth: true
     }

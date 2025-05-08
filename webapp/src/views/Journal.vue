@@ -1,62 +1,89 @@
 <template>
   <div class="journal">
     <h1>Journal Entries</h1>
-    <div class="journal-controls">
-      <button @click="createNewEntry" class="btn-primary">Create New Journal Entry</button>
-      <div class="filters">
-        <input type="date" v-model="startDate" class="date-input" />
-        <input type="date" v-model="endDate" class="date-input" />
-        <button @click="applyDateFilter" class="btn-filter">Filter by Date</button>
-      </div>
+
+    <div v-if="showCreateForm">
+      <CreateJournalEntry
+        :accounts="accounts"
+        @success="handleCreateSuccess"
+        @cancel="toggleCreateForm"
+      />
     </div>
-    
-    <div v-if="loading" class="loading">
-      <p>Loading journal entries...</p>
-    </div>
-    
-    <div v-else-if="error" class="error">
-      <p>{{ error }}</p>
-      <button @click="fetchJournalEntries" class="btn-primary">Retry</button>
-    </div>
-    
+
     <div v-else>
-      <div v-if="journalEntries.length === 0" class="no-entries">
-        <p>No journal entries found.</p>
+      <div class="journal-controls">
+        <button @click="toggleCreateForm" class="btn-primary">Create New Journal Entry</button>
+        <div class="filters">
+          <input type="date" v-model="startDate" class="date-input" />
+          <input type="date" v-model="endDate" class="date-input" />
+          <button @click="applyDateFilter" class="btn-filter">Filter by Date</button>
+        </div>
       </div>
-      
-      <div v-else class="journal-entries">
-        <div v-for="entry in journalEntries" :key="entry.id" class="journal-entry">
-          <div class="entry-header">
-            <div>
-              <h3>Entry #{{ entry.id }}</h3>
-              <p class="entry-date">{{ formatDate(entry.date) }}</p>
-            </div>
-            <div class="entry-actions">
+
+      <div v-if="loading" class="loading">
+        <p>Loading journal entries...</p>
+      </div>
+
+      <div v-else-if="error" class="error">
+        <p>{{ error }}</p>
+        <button @click="fetchJournalEntries" class="btn-primary">Retry</button>
+      </div>
+
+      <div v-else>
+        <div v-if="journalEntries.length === 0" class="no-entries">
+          <p>No journal entries found.</p>
+        </div>
+
+        <div v-else class="journal-entries-list">
+          <div class="journal-entries-header">
+            <span class="col-id">Entry #</span>
+            <span class="col-date">Date</span>
+            <span class="col-desc">Description</span>
+            <span class="col-total">Total Amount</span>
+            <span class="col-actions">Actions</span>
+          </div>
+          
+          <div 
+            v-for="entry in journalEntries" 
+            :key="entry.id" 
+            class="journal-entry-row"
+            @mouseover="hoveredEntry = entry.id"
+            @mouseleave="hoveredEntry = null"
+          >
+            <span class="col-id">{{ entry.id }}</span>
+            <span class="col-date">{{ formatDate(entry.date) }}</span>
+            <span class="col-desc">{{ entry.description }}</span>
+            <span class="col-total">{{ formatCurrency(calculateEntryTotal(entry)) }}</span>
+            <span class="col-actions">
               <button @click="viewEntryDetails(entry)" class="btn-small">View</button>
               <button @click="editEntry(entry)" class="btn-small btn-edit">Edit</button>
+            </span>
+            
+            <!-- Detailed view that appears on hover -->
+            <div v-if="hoveredEntry === entry.id" class="entry-details-popup">
+              <div class="popup-header">
+                <h4>Entry #{{ entry.id }} - {{ formatDate(entry.date) }}</h4>
+                <div>{{ entry.description }}</div>
+              </div>
+              
+              <table class="entry-details-table">
+                <thead>
+                  <tr>
+                    <th>Account</th>
+                    <th>Debit</th>
+                    <th>Credit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(line, index) in processEntryLines(entry.lines)" :key="index">
+                    <td>{{ line.account_name }}</td>
+                    <td>{{ line.debit ? formatCurrency(line.debit) : '' }}</td>
+                    <td>{{ line.credit ? formatCurrency(line.credit) : '' }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
-          
-          <div class="entry-description">
-            <strong>Description:</strong> {{ entry.description }}
-          </div>
-          
-          <table class="entry-lines">
-            <thead>
-              <tr>
-                <th>Account</th>
-                <th>Debit</th>
-                <th>Credit</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(line, index) in entry.lines" :key="index">
-                <td>{{ line.account_name }}</td>
-                <td>{{ line.debit ? formatCurrency(line.debit) : '' }}</td>
-                <td>{{ line.credit ? formatCurrency(line.credit) : '' }}</td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </div>
     </div>
@@ -64,75 +91,80 @@
 </template>
 
 <script>
-import { buildApiUrl } from '../config/api';
+import CreateJournalEntry from './CreateJournalEntry.vue';
+import { buildApiUrl, getHeaders } from '../config/api';
 import { getAuthHeaders } from '../services/authService';
 
 export default {
   name: 'JournalView',
+  components: {
+    CreateJournalEntry,
+  },
   data() {
     return {
       journalEntries: [],
       loading: true,
       error: null,
       startDate: '',
-      endDate: ''
-    }
+      endDate: '',
+      showCreateForm: false,
+      accounts: [],
+      hoveredEntry: null,
+    };
   },
   methods: {
+    async fetchAccounts() {
+      try {
+        const fullUrl = buildApiUrl('api/ledger/accounts');
+        const response = await fetch(fullUrl, {
+          headers: getAuthHeaders(),
+          credentials: 'include',
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch accounts');
+        }
+        
+        const data = await response.json();
+        console.log('Accounts data:', data);
+        this.accounts = Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error('Error fetching accounts:', error);
+      }
+    },
+    toggleCreateForm() {
+      this.showCreateForm = !this.showCreateForm;
+    },
+    handleCreateSuccess() {
+      this.toggleCreateForm();
+      this.fetchJournalEntries();
+    },
     async fetchJournalEntries() {
       this.loading = true;
       this.error = null;
-      
+
       try {
-        let url = 'api/ledger/journal';
+        let url = 'api/ledger/journal/entries';
         const params = new URLSearchParams();
-        
+
         if (this.startDate && this.endDate) {
           params.append('start_date', this.startDate);
           params.append('end_date', this.endDate);
         }
 
         const fullUrl = buildApiUrl(`${url}?${params.toString()}`);
-        console.log('Fetching journal entries from:', fullUrl);
-        
         const response = await fetch(fullUrl, {
           headers: getAuthHeaders(),
-          credentials: 'include' // Ensure cookies are sent with the request
+          credentials: 'include',
         });
-        
-        console.log('Response status:', response.status);
-        console.log('Response headers:', Object.fromEntries([...response.headers.entries()]));
-        
-        // Check for empty response
-        const text = await response.text();
-        console.log('Raw response:', text);
-        
-        if (!text) {
-          throw new Error('Empty response from server');
-        }
-        
-        let data;
-        try {
-          // Try to parse as JSON
-          data = JSON.parse(text);
-        } catch (parseError) {
-          console.error('Error parsing JSON:', parseError);
-          throw new Error('Invalid JSON response from server');
-        }
-        
+
         if (!response.ok) {
-          throw new Error(data.message || 'Failed to fetch journal entries');
+          throw new Error('Failed to fetch journal entries');
         }
-        
-        // Make sure data is an array
-        if (!Array.isArray(data)) {
-          console.warn('Response is not an array, using empty array instead');
-          this.journalEntries = [];
-          return;
-        }
-        
-        console.log('Parsed data:', data);
-        this.journalEntries = data;
+
+        const data = await response.json();
+        console.log('Journal entries data:', data);
+        this.journalEntries = Array.isArray(data) ? data : [];
       } catch (err) {
         console.error('Error fetching journal entries:', err);
         this.error = `Failed to load journal entries: ${err.message}`;
@@ -140,11 +172,25 @@ export default {
         this.loading = false;
       }
     },
-    formatCurrency(value) {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD'
-      }).format(value);
+
+    // Transform the journal entry lines into a format that displays correctly in the table
+    processEntryLines(lines) {
+      return lines.map(line => {
+        return {
+          account_id: line.account_id,
+          account_name: line.account_name,
+          account_number: line.account_number,
+          debit: line.type === 'debit' ? line.amount : null,
+          credit: line.type === 'credit' ? line.amount : null
+        };
+      });
+    },
+    applyDateFilter() {
+      if (!this.startDate || !this.endDate) {
+        alert('Please select both start and end dates');
+        return;
+      }
+      this.fetchJournalEntries();
     },
     formatDate(dateString) {
       const date = new Date(dateString);
@@ -154,9 +200,11 @@ export default {
         day: 'numeric'
       }).format(date);
     },
-    createNewEntry() {
-      // This function will be implemented later
-      alert('Create new journal entry feature will be added soon');
+    formatCurrency(value) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+      }).format(value);
     },
     viewEntryDetails(entry) {
       // This function will be implemented later
@@ -166,12 +214,11 @@ export default {
       // This function will be implemented later
       alert(`Edit entry #${entry.id}`);
     },
-    applyDateFilter() {
-      if (!this.startDate || !this.endDate) {
-        alert('Please select both start and end dates');
-        return;
-      }
-      this.fetchJournalEntries();
+    calculateEntryTotal(entry) {
+      // Calculate total based on debits only
+      return entry.lines.reduce((total, line) => {
+        return total + (line.type === 'debit' ? parseFloat(line.amount) : 0);
+      }, 0);
     }
   },
   mounted() {
@@ -185,6 +232,7 @@ export default {
     this.startDate = firstDay.toISOString().split('T')[0];
     this.endDate = lastDay.toISOString().split('T')[0];
     
+    this.fetchAccounts();
     this.fetchJournalEntries();
   }
 }
@@ -193,6 +241,9 @@ export default {
 <style scoped>
 .journal {
   padding: 20px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .journal-controls {
@@ -240,41 +291,94 @@ export default {
   background-color: #f0ad4e;
 }
 
-.journal-entries {
+.journal-entries-list {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 10px;
+  width: 100%;
 }
 
-.journal-entry {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 15px;
-  background-color: #f9f9f9;
+.journal-entries-header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+  padding: 10px;
+  background-color: #f1f1f1;
+  border-radius: 4px;
+  width: 100%;
 }
 
-.entry-header {
+.journal-entry-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #fff;
+  position: relative;
+  width: 100%;
+}
+
+.journal-entry-row:hover {
+  background-color: #f9f9f9;
+}
+
+.col-id {
+  flex: 0 0 10%;
+  text-align: center;
+}
+
+.col-date {
+  flex: 0 0 20%;
+  text-align: center;
+}
+
+.col-desc {
+  flex: 0 0 30%;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 10px;
+}
+
+.col-total {
+  flex: 0 0 20%;
+  text-align: right;
+}
+
+.col-actions {
+  flex: 0 0 20%;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+}
+
+.entry-details-popup {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.popup-header {
   margin-bottom: 10px;
 }
 
-.entry-date {
-  color: #666;
-  margin-top: 5px;
-}
-
-.entry-description {
-  margin-bottom: 15px;
-}
-
-.entry-lines {
+.entry-details-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.entry-lines th, .entry-lines td {
+.entry-details-table th, .entry-details-table td {
   padding: 8px;
   text-align: left;
   border-bottom: 1px solid #ddd;

@@ -73,6 +73,12 @@ API_ENDPOINTS = [
         'path': '/api/ledger/balance-sheet',
         'fields': []
     },
+    {
+        'name': 'Get Income and Expenses History',
+        'method': 'GET',
+        'path': '/api/ledger/history',
+        'fields': []
+    },
     
     # Account management endpoints
     {

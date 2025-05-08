@@ -4,6 +4,7 @@ from models import db, Ledger, Account, AccountType, TransactionLine, JournalEnt
 from sqlalchemy import func, case
 from decimal import Decimal
 from functools import wraps
+from datetime import datetime
 
 ledger_bp = Blueprint('ledger_bp', __name__)
 
@@ -316,4 +317,57 @@ def get_balance_sheet():
         'total_liabilities': str(total_liabilities),
         'total_equity': str(total_equity),
         'balanced': total_assets == (total_liabilities + total_equity)
+    }), 200
+
+@ledger_bp.route('/history', methods=['GET'])
+@login_required
+def get_income_expenses_history():
+    """Get a 12-month daily income and expenses report."""
+    user_id = session['user_id']
+
+    # Calculate daily income and expenses for the last 12 months
+    from datetime import datetime, timedelta
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=365)
+
+    history_query = db.session.query(
+        func.date(JournalEntry.date).label('entry_date'),
+        func.sum(
+            case(
+                (Account.type == AccountType.INCOME, -TransactionLine.amount),
+                (Account.type == AccountType.EXPENSE, TransactionLine.amount),
+                else_=0
+            )
+        ).label('net_change')
+    ).join(TransactionLine.journal_entry)\
+    .join(TransactionLine.account)\
+    .filter(JournalEntry.user_id == user_id)\
+    .filter(JournalEntry.date >= start_date, JournalEntry.date <= end_date)\
+    .group_by(func.date(JournalEntry.date))\
+    .order_by(func.date(JournalEntry.date))\
+    .all()
+
+    # Prepare the response data grouped by measure (income and expenses)
+    report = {
+        'expenses': [],
+        'income': []
+    }
+
+    for entry in history_query:
+        entry_date = datetime.strptime(entry.entry_date, '%Y-%m-%d') if isinstance(entry.entry_date, str) else entry.entry_date
+        data_point = {
+            'date': entry_date.strftime('%Y-%m-%d'),
+            'net_change': float(entry.net_change)
+        }
+
+        if entry.net_change > 0:  # Positive values are expenses
+            report['expenses'].append(data_point)
+        else:  # Negative values are income
+            data_point['net_change'] = abs(data_point['net_change'])  # Convert to positive for clarity
+            report['income'].append(data_point)
+
+    return jsonify({
+        'report': report,
+        'start_date': start_date.strftime('%Y-%m-%d'),
+        'end_date': end_date.strftime('%Y-%m-%d')
     }), 200
