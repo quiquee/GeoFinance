@@ -42,13 +42,16 @@ export default {
 }
 
 .dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 20px;
-  margin-top: 30px;
 }
 
 .dashboard-card {
+  flex: 1 1 calc(33.333% - 40px); /* Adjust width for 3 cards per row with gap */
+  max-width: 300px; /* Ensure cards don't grow too large */
+  box-sizing: border-box;
   background-color: #f5f5f5;
   border-radius: 8px;
   padding: 20px;
@@ -58,6 +61,18 @@ export default {
 
 .dashboard-card:hover {
   transform: translateY(-5px);
+}
+
+@media (max-width: 768px) {
+  .dashboard-card {
+    flex: 1 1 calc(50% - 20px); /* Adjust to 2 cards per row on smaller screens */
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-card {
+    flex: 1 1 100%; /* Stack cards vertically on very small screens */
+  }
 }
 
 .btn {

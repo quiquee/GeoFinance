@@ -8,8 +8,8 @@
         <select id="report-type" v-model="selectedReportType">
           <option value="balance-sheet">Balance Sheet</option>
           <option value="income-statement">Income Statement</option>
-          <option value="cash-flow">Cash Flow Statement</option>
           <option value="trial-balance">Trial Balance</option>
+          <option value="ledger-balance">Ledger Balance</option> <!-- Added Ledger Balance option -->
         </select>
       </div>
       
@@ -42,45 +42,45 @@
       <button @click="generateReport" class="btn-primary">Retry</button>
     </div>
     
-    <div v-else-if="reportData" class="report-container">
+    <div v-else-if="reportData || ledgerBalance" class="report-container">
       <!-- Balance Sheet Report -->
       <div v-if="selectedReportType === 'balance-sheet'" class="report">
         <h2>Balance Sheet</h2>
         <h3>As of {{ formatDate(asOfDate) }}</h3>
-        
+
         <div class="report-section">
           <h4>Assets</h4>
-          <div v-for="(account, index) in reportData.assets" :key="'asset-'+index" class="report-line">
-            <span class="account-name">{{ account.name }}</span>
+          <div v-for="(account, index) in reportData.asset_accounts" :key="'asset-'+index" class="report-line">
+            <span class="account-name">{{ account.account_name }} ({{ account.account_number }})</span>
             <span class="account-value">{{ formatCurrency(account.balance) }}</span>
           </div>
           <div class="report-total">
             <span>Total Assets</span>
-            <span>{{ formatCurrency(reportData.totalAssets) }}</span>
+            <span>{{ formatCurrency(reportData.total_assets) }}</span>
           </div>
         </div>
-        
+
         <div class="report-section">
           <h4>Liabilities</h4>
-          <div v-for="(account, index) in reportData.liabilities" :key="'liability-'+index" class="report-line">
-            <span class="account-name">{{ account.name }}</span>
+          <div v-for="(account, index) in reportData.liability_accounts" :key="'liability-'+index" class="report-line">
+            <span class="account-name">{{ account.account_name }} ({{ account.account_number }})</span>
             <span class="account-value">{{ formatCurrency(account.balance) }}</span>
           </div>
           <div class="report-total">
             <span>Total Liabilities</span>
-            <span>{{ formatCurrency(reportData.totalLiabilities) }}</span>
+            <span>{{ formatCurrency(reportData.total_liabilities) }}</span>
           </div>
         </div>
-        
+
         <div class="report-section">
           <h4>Equity</h4>
-          <div v-for="(account, index) in reportData.equity" :key="'equity-'+index" class="report-line">
-            <span class="account-name">{{ account.name }}</span>
+          <div v-for="(account, index) in reportData.equity_accounts" :key="'equity-'+index" class="report-line">
+            <span class="account-name">{{ account.account_name }} ({{ account.account_number || 'N/A' }})</span>
             <span class="account-value">{{ formatCurrency(account.balance) }}</span>
           </div>
           <div class="report-total">
             <span>Total Equity</span>
-            <span>{{ formatCurrency(reportData.totalEquity) }}</span>
+            <span>{{ formatCurrency(reportData.total_equity) }}</span>
           </div>
         </div>
       </div>
@@ -89,35 +89,88 @@
       <div v-else-if="selectedReportType === 'income-statement'" class="report">
         <h2>Income Statement</h2>
         <h3>{{ formatDate(startDate) }} - {{ formatDate(endDate) }}</h3>
-        
+
         <div class="report-section">
-          <h4>Revenue</h4>
-          <div v-for="(account, index) in reportData.revenue" :key="'revenue-'+index" class="report-line">
-            <span class="account-name">{{ account.name }}</span>
+          <h4>Income</h4>
+          <div v-for="(account, index) in reportData.income_accounts" :key="'income-'+index" class="report-line">
+            <span class="account-name">{{ account.account_name }} ({{ account.account_number }})</span>
             <span class="account-value">{{ formatCurrency(account.balance) }}</span>
           </div>
           <div class="report-total">
-            <span>Total Revenue</span>
-            <span>{{ formatCurrency(reportData.totalRevenue) }}</span>
+            <span>Total Income</span>
+            <span>{{ formatCurrency(reportData.total_income) }}</span>
           </div>
         </div>
-        
+
         <div class="report-section">
           <h4>Expenses</h4>
-          <div v-for="(account, index) in reportData.expenses" :key="'expense-'+index" class="report-line">
-            <span class="account-name">{{ account.name }}</span>
+          <div v-for="(account, index) in reportData.expense_accounts" :key="'expense-'+index" class="report-line">
+            <span class="account-name">{{ account.account_name }} ({{ account.account_number }})</span>
             <span class="account-value">{{ formatCurrency(account.balance) }}</span>
           </div>
           <div class="report-total">
             <span>Total Expenses</span>
-            <span>{{ formatCurrency(reportData.totalExpenses) }}</span>
+            <span>{{ formatCurrency(reportData.total_expenses) }}</span>
           </div>
         </div>
-        
+
         <div class="net-income">
           <span>Net Income</span>
-          <span>{{ formatCurrency(reportData.netIncome) }}</span>
+          <span>{{ formatCurrency(reportData.net_income) }}</span>
         </div>
+      </div>
+      
+      <!-- Trial Balance Report -->
+      <div v-else-if="selectedReportType === 'trial-balance'" class="report">
+        <h2>Trial Balance</h2>
+        <h3>{{ formatDate(asOfDate) }}</h3>
+
+        <table class="trial-balance-table">
+          <thead>
+            <tr>
+              <th>Account Name</th>
+              <th>Account Number</th>
+              <th>Account Type</th>
+              <th>Debit Balance</th>
+              <th>Credit Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(account, index) in reportData.trial_balance" :key="'trial-'+index">
+              <td>{{ account.account_name }}</td>
+              <td>{{ account.account_number }}</td>
+              <td>{{ account.account_type }}</td>
+              <td>{{ formatCurrency(account.debit_balance) }}</td>
+              <td>{{ formatCurrency(account.credit_balance) }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="report-totals">
+          <div>
+            <strong>Total Debits:</strong> {{ formatCurrency(reportData.total_debits) }}
+          </div>
+          <div>
+            <strong>Total Credits:</strong> {{ formatCurrency(reportData.total_credits) }}
+          </div>
+        </div>
+
+        <div v-if="reportData.balanced" class="balanced-message">
+          <p>The trial balance is balanced.</p>
+        </div>
+        <div v-else class="unbalanced-message">
+          <p>The trial balance is not balanced.</p>
+        </div>
+      </div>
+      
+      <!-- Ledger Balance Report -->
+      <div v-else-if="selectedReportType === 'ledger-balance'" class="report">
+        <h2>Ledger Balance</h2>
+        <ul>
+          <li v-for="account in ledgerBalance" :key="account.account_id">
+            <strong>{{ account.account_name }} ({{ account.account_number }})</strong>: {{ formatCurrency(account.balance) }}
+          </li>
+        </ul>
       </div>
       
       <!-- Other report types would be implemented similarly -->
@@ -150,6 +203,7 @@ export default {
       startDate: '',
       endDate: '',
       reportData: null,
+      ledgerBalance: null, // Added ledger balance data
       loading: false,
       error: null
     }
@@ -165,12 +219,17 @@ export default {
       this.error = null;
       
       try {
-        let url = `api/ledger/reports/${this.selectedReportType}`;
-        const params = new URLSearchParams();
-        
-        if (this.isBalanceSheetOrTrial) {
-          params.append('as_of_date', this.asOfDate);
+        let url;
+        if (this.selectedReportType === 'ledger-balance') {
+          url = 'api/ledger/balance';
         } else {
+          url = `api/ledger/${this.selectedReportType}`;
+        }
+
+        const params = new URLSearchParams();
+        if (this.isBalanceSheetOrTrial && this.selectedReportType !== 'ledger-balance') {
+          params.append('as_of_date', this.asOfDate);
+        } else if (this.selectedReportType !== 'ledger-balance') {
           params.append('start_date', this.startDate);
           params.append('end_date', this.endDate);
         }
@@ -179,13 +238,13 @@ export default {
         console.log('Fetching report from:', fullUrl);
         
         const response = await fetch(fullUrl, {
-          headers: getAuthHeaders()
+          headers: getAuthHeaders(),
+          credentials: 'include' // Ensure cookies are sent with the request
         });
         
         console.log('Response status:', response.status);
         console.log('Response headers:', Object.fromEntries([...response.headers.entries()]));
         
-        // Check for empty response
         const text = await response.text();
         console.log('Raw response:', text);
         
@@ -195,7 +254,6 @@ export default {
         
         let data;
         try {
-          // Try to parse as JSON
           data = JSON.parse(text);
         } catch (parseError) {
           console.error('Error parsing JSON:', parseError);
@@ -206,8 +264,11 @@ export default {
           throw new Error(data.message || `Failed to generate ${this.selectedReportType} report`);
         }
         
-        console.log('Parsed data:', data);
-        this.reportData = data;
+        if (this.selectedReportType === 'ledger-balance') {
+          this.ledgerBalance = data; // Store ledger balance data
+        } else {
+          this.reportData = data;
+        }
       } catch (err) {
         console.error('Error generating report:', err);
         this.error = `Failed to generate report: ${err.message}`;
@@ -251,6 +312,7 @@ export default {
   watch: {
     selectedReportType() {
       this.reportData = null;
+      this.ledgerBalance = null; // Reset ledger balance data
     }
   }
 }
@@ -363,6 +425,39 @@ label {
   padding: 15px 0;
   margin-top: 20px;
   border-top: 2px solid #42b983;
+}
+
+.trial-balance-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+.trial-balance-table th, .trial-balance-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+.trial-balance-table th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+.report-totals {
+  margin-top: 20px;
+}
+
+.balanced-message {
+  color: #42b983;
+  font-weight: bold;
+  margin-top: 20px;
+}
+
+.unbalanced-message {
+  color: #dc3545;
+  font-weight: bold;
+  margin-top: 20px;
 }
 
 .report-actions {

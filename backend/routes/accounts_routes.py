@@ -5,7 +5,7 @@ from functools import wraps # Import wraps
 
 accounts_bp = Blueprint('accounts_bp', __name__)
 
-# Helper to check if user is logged in (optional, if these are admin-only routes)
+# Helper to check if user is logged in
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):

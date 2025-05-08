@@ -1,5 +1,5 @@
 # backend/routes/ledger_routes.py
-from flask import Blueprint, jsonify, session, request
+from flask import Blueprint, jsonify, request, session
 from models import db, Ledger, Account, AccountType, TransactionLine, JournalEntry
 from sqlalchemy import func, case
 from decimal import Decimal
@@ -42,7 +42,6 @@ def get_user_ledger():
 def delete_user_ledger():
     """Delete a user's ledger and all related data. Use with caution."""
     user_id = session['user_id']
-    
     # Check if ledger exists
     ledger = Ledger.query.get(user_id)
     if not ledger:
@@ -71,7 +70,6 @@ def delete_user_ledger():
 def get_ledger_balance():
     """Get account balances for the current user's ledger."""
     user_id = session['user_id']
-
     # Calculate sum of debits and credits for each account for the user
     balances_query = db.session.query(
         Account.id.label('account_id'),
@@ -122,7 +120,6 @@ def get_ledger_balance():
 def get_trial_balance():
     """Get trial balance report showing debit and credit balances of all accounts."""
     user_id = session['user_id']
-    
     # Calculate sum of debits and credits for each account
     trial_balance_query = db.session.query(
         Account.id.label('account_id'),
@@ -170,7 +167,6 @@ def get_trial_balance():
 def get_income_statement():
     """Get income statement showing revenues, expenses, and net income."""
     user_id = session['user_id']
-    
     # Calculate balance for income and expense accounts
     income_statement_query = db.session.query(
         Account.id.label('account_id'),
@@ -237,7 +233,6 @@ def get_income_statement():
 def get_balance_sheet():
     """Get balance sheet showing assets, liabilities, and equity."""
     user_id = session['user_id']
-    
     # Calculate balance for balance sheet accounts
     balance_sheet_query = db.session.query(
         Account.id.label('account_id'),

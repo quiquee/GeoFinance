@@ -3,13 +3,13 @@ from flask import Blueprint, request, jsonify, session
 from models import db, JournalEntry, TransactionLine, Account, AccountType
 from decimal import Decimal
 from sqlalchemy.exc import IntegrityError
-from functools import wraps # Import wraps
+from functools import wraps
 
 journal_bp = Blueprint('journal_bp', __name__)
 
 # Helper to check if user is logged in
 def login_required(f):
-    @wraps(f) # Important for preserving function metadata
+    @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
             return jsonify({'message': 'Authentication required'}), 401

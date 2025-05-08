@@ -80,7 +80,8 @@ export default {
         console.log('Fetching accounts from:', buildApiUrl('api/ledger/accounts'));
         
         const response = await fetch(buildApiUrl('api/ledger/accounts'), {
-          headers: getAuthHeaders()
+          headers: getAuthHeaders(),
+          credentials: 'include' // Ensure cookies are sent with the request
         });
         
         console.log('Response status:', response.status);

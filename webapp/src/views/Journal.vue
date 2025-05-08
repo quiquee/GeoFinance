@@ -96,7 +96,8 @@ export default {
         console.log('Fetching journal entries from:', fullUrl);
         
         const response = await fetch(fullUrl, {
-          headers: getAuthHeaders()
+          headers: getAuthHeaders(),
+          credentials: 'include' // Ensure cookies are sent with the request
         });
         
         console.log('Response status:', response.status);
