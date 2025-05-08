@@ -2,9 +2,43 @@
   <div class="accounts">
     <h1>Chart of Accounts</h1>
     <div class="accounts-controls">
-      <button @click="createNewAccount" class="btn-primary">Create New Account</button>
+      <button @click="showCreateAccountModal = true" class="btn-primary">Create New Account</button>
       <div class="search-box">
         <input type="text" v-model="searchTerm" placeholder="Search accounts..." />
+      </div>
+    </div>
+    
+    <!-- Create Account Modal -->
+    <div v-if="showCreateAccountModal" class="modal">
+      <div class="modal-content">
+        <h2>Create New Account</h2>
+        <form @submit.prevent="createAccount">
+          <div class="form-group">
+            <label for="accountNumber">Account Number:</label>
+            <input type="text" id="accountNumber" v-model="newAccount.number" required class="form-control" />
+          </div>
+          
+          <div class="form-group">
+            <label for="accountName">Account Name:</label>
+            <input type="text" id="accountName" v-model="newAccount.name" required class="form-control" />
+          </div>
+          
+          <div class="form-group">
+            <label for="accountType">Account Type:</label>
+            <select id="accountType" v-model="newAccount.type" required class="form-control">
+              <option value="asset">Asset</option>
+              <option value="liability">Liability</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+              <option value="equity">Equity</option>
+            </select>
+          </div>
+          
+          <div class="button-container">
+            <button type="submit" class="btn-primary">Create Account</button>
+            <button type="button" @click="showCreateAccountModal = false" class="btn-secondary">Cancel</button>
+          </div>
+        </form>
       </div>
     </div>
     
@@ -56,7 +90,13 @@ export default {
       accounts: [],
       loading: true,
       error: null,
-      searchTerm: ''
+      searchTerm: '',
+      showCreateAccountModal: false,
+      newAccount: {
+        name: '',
+        number: '',
+        type: 'asset'
+      }
     }
   },
   computed: {
@@ -124,6 +164,37 @@ export default {
         this.loading = false;
       }
     },
+    async createAccount() {
+      try {
+        const response = await fetch(buildApiUrl('api/ledger/accounts'), {
+          method: 'POST',
+          headers: {
+            ...getAuthHeaders(),
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(this.newAccount),
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to create account');
+        }
+        
+        // Reset form and close modal
+        this.newAccount = { name: '', number: '', type: 'asset' };
+        this.showCreateAccountModal = false;
+        
+        // Refresh accounts list
+        await this.fetchAccounts();
+        
+        // Show success message
+        alert('Account created successfully');
+      } catch (err) {
+        console.error('Error creating account:', err);
+        alert(`Failed to create account: ${err.message}`);
+      }
+    },
     formatCurrency(value) {
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
@@ -131,15 +202,12 @@ export default {
       }).format(value);
     },
     createNewAccount() {
-      // This function will be implemented later
-      alert('Create account feature will be added soon');
+      this.showCreateAccountModal = true;
     },
     viewAccountDetails(account) {
-      // This function will be implemented later
       alert(`View details for account: ${account.name}`);
     },
     editAccount(account) {
-      // This function will be implemented later
       alert(`Edit account: ${account.name}`);
     }
   },
@@ -223,5 +291,61 @@ export default {
 
 .actions {
   white-space: nowrap;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  width: 500px;
+  max-width: 90%;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.form-control {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.button-container {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 4px;
+  cursor: pointer;
 }
 </style>
