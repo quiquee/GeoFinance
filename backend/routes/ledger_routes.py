@@ -121,8 +121,13 @@ def get_ledger_balance():
 def get_trial_balance():
     """Get trial balance report showing debit and credit balances of all accounts."""
     user_id = session['user_id']
-    # Calculate sum of debits and credits for each account
-    trial_balance_query = db.session.query(
+    
+    # Get optional date range parameters
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    
+    # Build the base query
+    query = db.session.query(
         Account.id.label('account_id'),
         Account.name.label('account_name'),
         Account.number.label('account_number'),
@@ -131,9 +136,25 @@ def get_trial_balance():
         func.sum(case((TransactionLine.type == 'credit', TransactionLine.amount), else_=0)).label('credit_total')
     ).join(TransactionLine.account)\
     .join(TransactionLine.journal_entry)\
-    .filter(JournalEntry.user_id == user_id)\
-    .group_by(Account.id, Account.name, Account.number, Account.type)\
-    .all()
+    .filter(JournalEntry.user_id == user_id)
+    
+    # Apply date filters if provided
+    if start_date:
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d')
+            query = query.filter(JournalEntry.date >= start_date)
+        except ValueError:
+            return jsonify({'error': 'Invalid start_date format, use YYYY-MM-DD'}), 400
+            
+    if end_date:
+        try:
+            end_date = datetime.strptime(end_date, '%Y-%m-%d')
+            query = query.filter(JournalEntry.date <= end_date)
+        except ValueError:
+            return jsonify({'error': 'Invalid end_date format, use YYYY-MM-DD'}), 400
+    
+    # Complete the query with grouping
+    trial_balance_query = query.group_by(Account.id, Account.name, Account.number, Account.type).all()
     
     # Prepare trial balance report
     trial_balance = []
@@ -156,12 +177,20 @@ def get_trial_balance():
             'credit_balance': str(credit_balance)
         })
     
-    return jsonify({
+    # Include date range information in the response
+    response = {
         'trial_balance': trial_balance,
         'total_debits': str(total_debits),
         'total_credits': str(total_credits),
         'balanced': total_debits == total_credits
-    }), 200
+    }
+    
+    if start_date:
+        response['start_date'] = start_date.strftime('%Y-%m-%d')
+    if end_date:
+        response['end_date'] = end_date.strftime('%Y-%m-%d')
+        
+    return jsonify(response), 200
 
 @ledger_bp.route('/income-statement', methods=['GET'])
 @login_required

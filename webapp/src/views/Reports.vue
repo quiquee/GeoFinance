@@ -310,9 +310,9 @@ export default {
         }
 
         const params = new URLSearchParams();
-        if (this.isBalanceSheetOrTrial && this.selectedReportType !== 'ledger-balance') {
+        if (this.isBalanceSheetOrTrial ) {
           params.append('as_of_date', this.asOfDate);
-        } else if (this.selectedReportType !== 'ledger-balance') {
+        } else {
           params.append('start_date', this.startDate);
           params.append('end_date', this.endDate);
         }
