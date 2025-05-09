@@ -71,6 +71,23 @@ def delete_user_ledger():
 def get_ledger_balance():
     """Get account balances for the current user's ledger."""
     user_id = session['user_id']
+
+    # Get optional date range parameters
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    if start_date:
+        try:
+            start_date_obj = datetime.strptime(start_date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'error': 'Invalid start_date format, use YYYY-MM-DD'}), 400
+    if end_date:
+        try:
+            end_date_obj = datetime.strptime(end_date, '%Y-%m-%d')
+            # include full end_date by setting time to 23:59:59
+            end_date_obj = end_date_obj.replace(hour=23, minute=59, second=59)
+        except ValueError:
+            return jsonify({'error': 'Invalid end_date format, use YYYY-MM-DD'}), 400
+
     # Calculate sum of debits and credits for each account for the user
     balances_query = db.session.query(
         Account.id.label('account_id'),
@@ -86,9 +103,15 @@ def get_ledger_balance():
         ).label('balance_change')
     ).join(TransactionLine.account)\
     .join(TransactionLine.journal_entry)\
-    .filter(JournalEntry.user_id == user_id)\
-    .group_by(Account.id, Account.name, Account.number, Account.type)\
-    .all()
+    .filter(JournalEntry.user_id == user_id)
+
+    # Apply date filters if provided
+    if start_date:
+        balances_query = balances_query.filter(JournalEntry.date >= start_date_obj)
+    if end_date:
+        balances_query = balances_query.filter(JournalEntry.date <= end_date_obj)
+
+    balances_query = balances_query.group_by(Account.id, Account.name, Account.number, Account.type).all()
 
     # Get all accounts to include those with no transactions (balance 0)
     all_accounts = Account.query.order_by(Account.number).all()
@@ -148,8 +171,10 @@ def get_trial_balance():
             
     if end_date:
         try:
-            end_date = datetime.strptime(end_date, '%Y-%m-%d')
-            query = query.filter(JournalEntry.date <= end_date)
+            end_date_obj = datetime.strptime(end_date, '%Y-%m-%d')
+            # include full end_date by setting time to 23:59:59
+            end_date_obj = end_date_obj.replace(hour=23, minute=59, second=59)
+            query = query.filter(JournalEntry.date <= end_date_obj)
         except ValueError:
             return jsonify({'error': 'Invalid end_date format, use YYYY-MM-DD'}), 400
     
@@ -263,6 +288,18 @@ def get_income_statement():
 def get_balance_sheet():
     """Get balance sheet showing assets, liabilities, and equity."""
     user_id = session['user_id']
+    
+    # Get optional as_of_date parameter
+    as_of_date = request.args.get('as_of_date')
+    as_of_date_obj = None
+    if as_of_date:
+        try:
+            as_of_date_obj = datetime.strptime(as_of_date, '%Y-%m-%d')
+            # include full end-of-day for as_of_date
+            as_of_date_obj = as_of_date_obj.replace(hour=23, minute=59, second=59)
+        except ValueError:
+            return jsonify({'error': 'Invalid as_of_date format, use YYYY-MM-DD'}), 400
+    
     # Calculate balance for balance sheet accounts
     balance_sheet_query = db.session.query(
         Account.id.label('account_id'),
@@ -278,20 +315,47 @@ def get_balance_sheet():
         ).label('balance_change')
     ).join(TransactionLine.account)\
     .join(TransactionLine.journal_entry)\
-    .filter(JournalEntry.user_id == user_id)\
-    .filter(Account.type.in_([AccountType.ASSET, AccountType.LIABILITY, AccountType.OFF_BALANCE]))\
-    .group_by(Account.id, Account.name, Account.number, Account.type)\
-    .all()
-    
-    # Get net income for equity
-    income_statement = get_income_statement()[0].json
-    
+    .filter(JournalEntry.user_id == user_id)
+    # apply date filter if provided
+    if as_of_date_obj:
+        balance_sheet_query = balance_sheet_query.filter(JournalEntry.date <= as_of_date_obj)
+    balance_sheet_query = balance_sheet_query.filter(
+        Account.type.in_([AccountType.ASSET, AccountType.LIABILITY, AccountType.OFF_BALANCE])
+    ).group_by(Account.id, Account.name, Account.number, Account.type).all()
+
+    # Calculate net income up to as_of_date for equity
+    income_stmt_q = db.session.query(
+        Account.type.label('account_type'),
+        func.sum(
+            case(
+                (TransactionLine.type == 'debit', TransactionLine.amount),
+                (TransactionLine.type == 'credit', -TransactionLine.amount),
+                else_=0
+            )
+        ).label('balance_change')
+    ).join(TransactionLine.account)\
+    .join(TransactionLine.journal_entry)\
+    .filter(JournalEntry.user_id == user_id)
+    if as_of_date_obj:
+        income_stmt_q = income_stmt_q.filter(JournalEntry.date <= as_of_date_obj)
+    income_stmt_q = income_stmt_q.filter(
+        Account.type.in_([AccountType.INCOME, AccountType.EXPENSE])
+    ).group_by(Account.type).all()
+
+    net_income = Decimal('0.00')
+    for rec in income_stmt_q:
+        bal = rec.balance_change or Decimal('0.00')
+        if rec.account_type == AccountType.INCOME:
+            net_income += -bal
+        else:
+            net_income -= bal
+
     asset_accounts = []
     liability_accounts = []
     equity_accounts = []
     total_assets = Decimal('0.00')
     total_liabilities = Decimal('0.00')
-    total_equity = Decimal(income_statement['net_income'])  # Start with net income
+    total_equity = net_income  # Start with net income
     
     for acc in balance_sheet_query:
         balance_change = acc.balance_change or Decimal('0.00')
@@ -335,10 +399,10 @@ def get_balance_sheet():
         'account_id': None,
         'account_name': 'Retained Earnings',
         'account_number': None,
-        'balance': income_statement['net_income']
+        'balance': str(net_income)
     })
     
-    return jsonify({
+    response = {
         'asset_accounts': asset_accounts,
         'liability_accounts': liability_accounts,
         'equity_accounts': equity_accounts,
@@ -346,7 +410,13 @@ def get_balance_sheet():
         'total_liabilities': str(total_liabilities),
         'total_equity': str(total_equity),
         'balanced': total_assets == (total_liabilities + total_equity)
-    }), 200
+    }
+
+    # Add as_of_date to response
+    if as_of_date:
+        response['as_of_date'] = as_of_date
+
+    return jsonify(response), 200
 
 @ledger_bp.route('/history', methods=['GET'])
 @login_required

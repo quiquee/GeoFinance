@@ -4,6 +4,7 @@ from models import db, JournalEntry, TransactionLine, Account, AccountType
 from decimal import Decimal
 from sqlalchemy.exc import IntegrityError
 from functools import wraps
+from datetime import datetime
 
 journal_bp = Blueprint('journal_bp', __name__)
 
@@ -87,8 +88,31 @@ def create_journal_entry():
 @login_required
 def get_journal_entries():
     user_id = session['user_id']
-    # TODO: Add pagination
-    entries = JournalEntry.query.filter_by(user_id=user_id).order_by(JournalEntry.date.desc()).all()
+    # Optional date range parameters
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    start_date_obj = end_date_obj = None
+    if start_date:
+        try:
+            start_date_obj = datetime.strptime(start_date, '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'error': 'Invalid start_date format, use YYYY-MM-DD'}), 400
+    if end_date:
+        try:
+            end_date_obj = datetime.strptime(end_date, '%Y-%m-%d')
+            # extend end_date to include entire day
+            end_date_obj = end_date_obj.replace(hour=23, minute=59, second=59)
+        except ValueError:
+            return jsonify({'error': 'Invalid end_date format, use YYYY-MM-DD'}), 400
+    # Build base query with date filters
+    query = JournalEntry.query.filter_by(user_id=user_id)
+    query = query.filter(1 >= 0)  # Dummy filter to allow chaining
+    if start_date_obj:
+        query = query.filter(JournalEntry.date >= start_date_obj)
+    if end_date_obj:
+        query = query.filter(JournalEntry.date <= end_date_obj)
+    entries = query.order_by(JournalEntry.date.desc()).all()
+    print("HERE I AMMMMMM")
     return jsonify([entry.to_dict() for entry in entries]), 200
 
 @journal_bp.route('/entries/<int:entry_id>', methods=['GET'])

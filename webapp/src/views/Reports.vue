@@ -52,54 +52,66 @@
             <h3 class="text-secondary">As of {{ formatDate(asOfDate) }}</h3>
           </div>
 
-          <div class="mb-4">
-            <h4 class="report-section-title">Assets</h4>
-            <BaseTable
-              :columns="assetColumns"
-              :items="reportData.asset_accounts"
-              :hasActions="false"
-            >
-              <template #cell-balance="{ value }">
-                {{ formatCurrency(value) }}
-              </template>
-            </BaseTable>
-            <div class="d-flex justify-content-between fw-bold py-3 border-top mt-2">
-              <span>Total Assets</span>
-              <span>{{ formatCurrency(reportData.total_assets) }}</span>
+          <div class="row">
+            <!-- Assets column -->
+            <div class="col-md-6 mb-4">
+              <h4 class="report-section-title">Assets</h4>
+              <BaseTable
+                :columns="assetColumns"
+                :items="reportData.asset_accounts"
+                :hasActions="false"
+              >
+                <template #cell-balance="{ value }">
+                  {{ formatCurrency(value) }}
+                </template>
+              </BaseTable>
+              <div class="d-flex justify-content-between fw-bold py-3 border-top mt-2">
+                <span>Total Assets</span>
+                <span>{{ formatCurrency(reportData.total_assets) }}</span>
+              </div>
             </div>
-          </div>
+            
+            <!-- Liabilities and Equity column -->
+            <div class="col-md-6">
+              <div class="mb-4">
+                <h4 class="report-section-title">Liabilities</h4>
+                <BaseTable
+                  :columns="liabilityColumns"
+                  :items="reportData.liability_accounts"
+                  :hasActions="false"
+                >
+                  <template #cell-balance="{ value }">
+                    {{ formatCurrency(value) }}
+                  </template>
+                </BaseTable>
+                <div class="d-flex justify-content-between fw-bold py-3 border-top mt-2">
+                  <span>Total Liabilities</span>
+                  <span>{{ formatCurrency(reportData.total_liabilities) }}</span>
+                </div>
+              </div>
 
-          <div class="mb-4">
-            <h4 class="report-section-title">Liabilities</h4>
-            <BaseTable
-              :columns="liabilityColumns"
-              :items="reportData.liability_accounts"
-              :hasActions="false"
-            >
-              <template #cell-balance="{ value }">
-                {{ formatCurrency(value) }}
-              </template>
-            </BaseTable>
-            <div class="d-flex justify-content-between fw-bold py-3 border-top mt-2">
-              <span>Total Liabilities</span>
-              <span>{{ formatCurrency(reportData.total_liabilities) }}</span>
-            </div>
-          </div>
-
-          <div class="mb-4">
-            <h4 class="report-section-title">Equity</h4>
-            <BaseTable
-              :columns="equityColumns"
-              :items="reportData.equity_accounts"
-              :hasActions="false"
-            >
-              <template #cell-balance="{ value }">
-                {{ formatCurrency(value) }}
-              </template>
-            </BaseTable>
-            <div class="d-flex justify-content-between fw-bold py-3 border-top mt-2">
-              <span>Total Equity</span>
-              <span>{{ formatCurrency(reportData.total_equity) }}</span>
+              <div class="mb-4">
+                <h4 class="report-section-title">Equity</h4>
+                <BaseTable
+                  :columns="equityColumns"
+                  :items="reportData.equity_accounts"
+                  :hasActions="false"
+                >
+                  <template #cell-balance="{ value }">
+                    {{ formatCurrency(value) }}
+                  </template>
+                </BaseTable>
+                <div class="d-flex justify-content-between fw-bold py-3 border-top mt-2">
+                  <span>Total Equity</span>
+                  <span>{{ formatCurrency(reportData.total_equity) }}</span>
+                </div>
+              </div>
+              
+              <!-- Total Liabilities and Equity -->
+              <div class="d-flex justify-content-between fw-bold fs-5 py-3 border-top mt-2">
+                <span>Total Liabilities and Equity</span>
+                <span>{{ formatCurrency(parseFloat(reportData.total_liabilities) + parseFloat(reportData.total_equity)) }}</span>
+              </div>
             </div>
           </div>
         </div>
