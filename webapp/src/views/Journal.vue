@@ -14,7 +14,7 @@
 
     <div v-else>
       <div class="d-flex justify-content-between align-items-center flex-wrap mb-4 gap-controls">
-        <button @click="toggleCreateForm" class="btn btn-primary">Create New Journal Entry</button>
+        <button @click="toggleCreateForm" class="btn btn-primary">Create New Journal</button>
         
         <DateRangePicker
           v-model:startDate="startDate"
