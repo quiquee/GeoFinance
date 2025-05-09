@@ -1,17 +1,15 @@
 <template>
   <div id="app">
-    <header v-if="isLoggedIn">
-      <h1>GeoFinance</h1>
-      <nav>
-        <router-link to="/">Home</router-link> |
-        <router-link to="/accounts">Accounts</router-link> |
-        <router-link to="/journal">Journal</router-link> |
-        <router-link to="/reports">Reports</router-link>
-        <div class="user-menu">
-          <span>{{ currentUser?.name || currentUser?.username }}</span>
-          <button @click="logout" class="btn-logout">Logout</button>
-        </div>
-      </nav>
+    <header v-if="isLoggedIn" class="main-header">
+      <div class="app-branding" @click="goToHome">
+        <h1>GeoFinance</h1>
+      </div>
+      
+      <FinancialBanner v-if="isLoggedIn" />
+      <div class="user-menu">
+        <span>{{ currentUser?.name || currentUser?.username }}</span>
+        <button @click="logout" class="btn-logout">Logout</button>
+      </div>
     </header>
     <main>
       <router-view/>
@@ -26,9 +24,13 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { isAuthenticated, getCurrentUser, logout as authLogout } from './services/authService';
+import FinancialBanner from './components/FinancialBanner.vue';
 
 export default {
   name: 'App',
+  components: {
+    FinancialBanner
+  },
   setup() {
     const router = useRouter();
     const isLoggedIn = ref(false);
@@ -48,6 +50,10 @@ export default {
       router.push('/login');
     };
 
+    const goToHome = () => {
+      router.push('/');
+    };
+
     onMounted(() => {
       checkAuthStatus();
     });
@@ -55,7 +61,8 @@ export default {
     return {
       isLoggedIn,
       currentUser,
-      logout
+      logout,
+      goToHome
     };
   }
 }
@@ -66,47 +73,46 @@ export default {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-align: center;
   color: #2c3e50;
-  margin-top: 20px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  margin: 0;
+  padding: 0;
 }
 
-nav {
-  padding: 20px 0;
+.main-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  position: relative;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background-color: #ffffff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
-nav a {
-  font-weight: bold;
-  color: #2c3e50;
-  text-decoration: none;
-  padding: 10px;
+.app-branding {
+  cursor: pointer;
+  transition: opacity 0.2s ease;
 }
 
-nav a.router-link-exact-active {
-  color: #42b983;
+.app-branding:hover {
+  opacity: 0.8;
 }
 
-header, footer {
-  padding: 20px;
+.app-branding h1 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #34495e;
 }
 
 main {
-  max-width: 1200px;
+  max-width: 100%;
   margin: 0 auto;
-  padding: 20px;
+  padding: 0;
   flex-grow: 1;
 }
 
 .user-menu {
-  position: absolute;
-  right: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -125,5 +131,24 @@ main {
 
 .btn-logout:hover {
   background-color: #e0e0e0;
+}
+
+footer {
+  padding: 20px;
+  text-align: center;
+  background-color: #f8f9fa;
+}
+
+@media (max-width: 768px) {
+  .main-header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px;
+  }
+  
+  .user-menu {
+    margin-top: 0;
+  }
 }
 </style>

@@ -92,7 +92,7 @@
 </template>
 
 <script>
-import { buildApiUrl, getHeaders } from '../config/api';
+import { post } from '../services/apiService';
 
 export default {
   props: {
@@ -190,22 +190,11 @@ export default {
           }))
         };
         
-        const response = await fetch(buildApiUrl("api/ledger/journal/entries"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-          credentials: 'include'
-        });
-        
-        if (!response.ok) {
-          const error = await response.json();
-          alert(`Error: ${error.message}`);
-        } else {
-          alert("Journal entry created successfully!");
-          this.$emit('success');
-        }
+        const response = await post("api/ledger/journal/entries", payload);
+        alert("Journal entry created successfully!");
+        this.$emit('success');
       } catch (error) {
-        alert(`Error: ${error.message}`);
+        alert(`Error: ${error.response?.data?.message || error.message}`);
       }
     },
   },

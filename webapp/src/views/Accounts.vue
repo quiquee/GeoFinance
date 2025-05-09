@@ -2,7 +2,7 @@
   <div class="accounts">
     <h1>Chart of Accounts</h1>
     <div class="accounts-controls">
-      <button @click="showCreateAccountModal = true" class="btn-primary">Create New Account</button>
+      <button @click="toggleCreateAccountModal" class="btn-primary">Create New Account</button>
       <div class="search-box">
         <input type="text" v-model="searchTerm" placeholder="Search accounts..." />
       </div>
@@ -36,7 +36,7 @@
           
           <div class="button-container">
             <button type="submit" class="btn-primary">Create Account</button>
-            <button type="button" @click="showCreateAccountModal = false" class="btn-secondary">Cancel</button>
+            <button type="button" @click="toggleCreateAccountModal" class="btn-secondary">Cancel</button>
           </div>
         </form>
       </div>
@@ -58,7 +58,6 @@
             <th>Account Number</th>
             <th>Name</th>
             <th>Type</th>
-            <th>Balance</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -67,10 +66,10 @@
             <td>{{ account.number }}</td>
             <td>{{ account.name }}</td>
             <td>{{ account.type }}</td>
-            <td>{{ formatCurrency(account.balance) }}</td>
             <td class="actions">
               <button @click="viewAccountDetails(account)" class="btn-small">View</button>
               <button @click="editAccount(account)" class="btn-small btn-edit">Edit</button>
+              <button @click="deleteAccount(account)" class="btn-small btn-secondary">Delete</button>
             </td>
           </tr>
         </tbody>
@@ -80,8 +79,7 @@
 </template>
 
 <script>
-import { buildApiUrl, getHeaders } from '../config/api';
-import { getAuthHeaders } from '../services/authService';
+import { get, post, del } from '../services/apiService';
 
 export default {
   name: 'AccountsView',
@@ -117,46 +115,8 @@ export default {
       this.error = null;
       
       try {
-        console.log('Fetching accounts from:', buildApiUrl('api/ledger/accounts'));
-        
-        const response = await fetch(buildApiUrl('api/ledger/accounts'), {
-          headers: getAuthHeaders(),
-          credentials: 'include' // Ensure cookies are sent with the request
-        });
-        
-        console.log('Response status:', response.status);
-        console.log('Response headers:', Object.fromEntries([...response.headers.entries()]));
-        
-        // Check for empty response
-        const text = await response.text();
-        console.log('Raw response:', text);
-        
-        if (!text) {
-          throw new Error('Empty response from server');
-        }
-        
-        let data;
-        try {
-          // Try to parse as JSON
-          data = JSON.parse(text);
-        } catch (parseError) {
-          console.error('Error parsing JSON:', parseError);
-          throw new Error('Invalid JSON response from server');
-        }
-        
-        if (!response.ok) {
-          throw new Error(data.message || 'Failed to fetch accounts data');
-        }
-        
-        // Make sure data is an array
-        if (!Array.isArray(data)) {
-          console.warn('Response is not an array, using empty array instead');
-          this.accounts = [];
-          return;
-        }
-        
-        console.log('Parsed data:', data);
-        this.accounts = data;
+        const response = await get('api/ledger/accounts');
+        this.accounts = response.data;
       } catch (err) {
         console.error('Error fetching accounts:', err);
         this.error = `Failed to load accounts: ${err.message}`;
@@ -164,45 +124,49 @@ export default {
         this.loading = false;
       }
     },
-    async createAccount() {
-      try {
-        const response = await fetch(buildApiUrl('api/ledger/accounts'), {
-          method: 'POST',
-          headers: {
-            ...getAuthHeaders(),
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(this.newAccount),
-          credentials: 'include'
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to create account');
-        }
-        
-        // Reset form and close modal
-        this.newAccount = { name: '', number: '', type: 'asset' };
-        this.showCreateAccountModal = false;
-        
-        // Refresh accounts list
-        await this.fetchAccounts();
-        
-        // Show success message
-        alert('Account created successfully');
-      } catch (err) {
-        console.error('Error creating account:', err);
-        alert(`Failed to create account: ${err.message}`);
+
+    toggleCreateAccountModal() {
+      this.showCreateAccountModal = !this.showCreateAccountModal;
+      if (!this.showCreateAccountModal) {
+        // Reset the form data when closing modal
+        this.newAccount = {
+          name: '',
+          number: '',
+          type: 'asset'
+        }; 
       }
     },
+
+    async createAccount() {
+      try {
+        await post('api/ledger/accounts', this.newAccount);
+        this.toggleCreateAccountModal();
+        this.fetchAccounts();
+      } catch (err) {
+        console.error('Error creating account:', err);
+        alert(`Failed to create account: ${err.response?.data?.message || err.message}`);
+      }
+    },
+
+    async deleteAccount(account) {
+      if(!confirm(`Are you sure you want to delete account ${account.number} - ${account.name}?`)) {
+        return;
+      }
+      
+      try {
+        await del(`api/ledger/accounts/${account.id}`);
+        this.fetchAccounts();
+      } catch (err) {
+        console.error('Error deleting account:', err);
+        alert(`Failed to delete account: ${err.response?.data?.message || err.message}`);
+      }
+    },
+
     formatCurrency(value) {
       return new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD'
       }).format(value);
-    },
-    createNewAccount() {
-      this.showCreateAccountModal = true;
     },
     viewAccountDetails(account) {
       alert(`View details for account: ${account.name}`);
@@ -212,7 +176,7 @@ export default {
     }
   },
   mounted() {
-    document.title = 'GeoFinance - Chart of Accounts';
+    document.title = 'GeoFinance - Accounts';
     this.fetchAccounts();
   }
 }
@@ -280,6 +244,15 @@ export default {
   background-color: #f0ad4e;
 }
 
+.btn-secondary {
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
 .loading, .error {
   text-align: center;
   padding: 30px;
@@ -338,14 +311,5 @@ export default {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 20px;
-}
-
-.btn-secondary {
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 4px;
-  cursor: pointer;
 }
 </style>

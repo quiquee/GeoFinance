@@ -57,6 +57,7 @@
             <span class="col-actions">
               <button @click="viewEntryDetails(entry)" class="btn-small">View</button>
               <button @click="editEntry(entry)" class="btn-small btn-edit">Edit</button>
+              <button @click="deleteEntry(entry.id)" class="btn-small btn-delete">Delete</button>
             </span>
             
             <!-- Detailed view that appears on hover -->
@@ -92,8 +93,7 @@
 
 <script>
 import CreateJournalEntry from './CreateJournalEntry.vue';
-import { buildApiUrl, getHeaders } from '../config/api';
-import { getAuthHeaders } from '../services/authService';
+import { get, del } from '../services/apiService';
 
 export default {
   name: 'JournalView',
@@ -115,19 +115,8 @@ export default {
   methods: {
     async fetchAccounts() {
       try {
-        const fullUrl = buildApiUrl('api/ledger/accounts');
-        const response = await fetch(fullUrl, {
-          headers: getAuthHeaders(),
-          credentials: 'include',
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch accounts');
-        }
-        
-        const data = await response.json();
-        console.log('Accounts data:', data);
-        this.accounts = Array.isArray(data) ? data : [];
+        const response = await get('api/ledger/accounts');
+        this.accounts = response.data || [];
       } catch (error) {
         console.error('Error fetching accounts:', error);
       }
@@ -145,26 +134,15 @@ export default {
 
       try {
         let url = 'api/ledger/journal/entries';
-        const params = new URLSearchParams();
+        const params = {};
 
         if (this.startDate && this.endDate) {
-          params.append('start_date', this.startDate);
-          params.append('end_date', this.endDate);
+          params.start_date = this.startDate;
+          params.end_date = this.endDate;
         }
 
-        const fullUrl = buildApiUrl(`${url}?${params.toString()}`);
-        const response = await fetch(fullUrl, {
-          headers: getAuthHeaders(),
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch journal entries');
-        }
-
-        const data = await response.json();
-        console.log('Journal entries data:', data);
-        this.journalEntries = Array.isArray(data) ? data : [];
+        const response = await get(url, params);
+        this.journalEntries = response.data || [];
       } catch (err) {
         console.error('Error fetching journal entries:', err);
         this.error = `Failed to load journal entries: ${err.message}`;
@@ -172,7 +150,21 @@ export default {
         this.loading = false;
       }
     },
-
+    
+    async deleteEntry(entryId) {
+      if (!confirm('Are you sure you want to delete this journal entry?')) {
+        return;
+      }
+      
+      try {
+        await del(`api/ledger/journal/entries/${entryId}`);
+        this.fetchJournalEntries();
+      } catch (err) {
+        console.error('Error deleting journal entry:', err);
+        alert(`Failed to delete entry: ${err.message}`);
+      }
+    },
+    
     // Transform the journal entry lines into a format that displays correctly in the table
     processEntryLines(lines) {
       return lines.map(line => {
@@ -289,6 +281,10 @@ export default {
 
 .btn-edit {
   background-color: #f0ad4e;
+}
+
+.btn-delete {
+  background-color: #dc3545;
 }
 
 .journal-entries-list {
