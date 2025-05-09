@@ -69,11 +69,14 @@ export default {
 </script>
 
 <style>
+/* Import the CSS variables */
+@import './styles/variables.css';
+
 #app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
+  font-family: var(--font-family-base);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  color: #2c3e50;
+  color: var(--color-text);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -85,14 +88,15 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 20px;
-  background-color: #ffffff;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  padding: var(--space-sm) var(--space-lg);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  height: var(--header-height);
 }
 
 .app-branding {
   cursor: pointer;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--transition-fast);
 }
 
 .app-branding:hover {
@@ -101,8 +105,8 @@ export default {
 
 .app-branding h1 {
   margin: 0;
-  font-size: 1.5rem;
-  color: #34495e;
+  font-size: var(--font-size-xl);
+  color: var(--color-text);
 }
 
 main {
@@ -115,28 +119,29 @@ main {
 .user-menu {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-sm);
 }
 
 .btn-logout {
-  background-color: #f0f0f0;
+  background-color: var(--color-background-alt);
   border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
+  padding: var(--space-xxs) var(--space-sm);
+  border-radius: var(--button-radius);
   cursor: pointer;
-  font-size: 14px;
-  color: #333;
-  transition: all 0.3s;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  transition: all var(--transition-fast);
 }
 
 .btn-logout:hover {
-  background-color: #e0e0e0;
+  background-color: var(--color-border);
 }
 
 footer {
-  padding: 20px;
+  padding: var(--space-lg);
   text-align: center;
-  background-color: #f8f9fa;
+  background-color: var(--color-background-alt);
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: 768px) {
@@ -144,7 +149,7 @@ footer {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    padding: 10px;
+    padding: var(--space-xs);
   }
   
   .user-menu {

@@ -1,0 +1,203 @@
+/**
+ * GeoFinance Button Styles
+ *
+ * This file contains all button-related styles used throughout the application.
+ */
+
+/* Base button styles */
+.btn {
+  display: inline-block;
+  font-weight: var(--font-weight-medium);
+  text-align: center;
+  white-space: nowrap;
+  vertical-align: middle;
+  user-select: none;
+  border: 1px solid transparent;
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  border-radius: var(--button-radius);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.btn:focus, .btn:hover {
+  text-decoration: none;
+  outline: 0;
+}
+
+.btn:disabled, .btn.disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* Button sizes */
+.btn-sm {
+  padding: var(--space-xxs) var(--space-xs);
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-sm);
+}
+
+.btn-lg {
+  padding: var(--space-sm) var(--space-lg);
+  font-size: var(--font-size-lg);
+  border-radius: var(--radius-md);
+}
+
+/* Button variants */
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-color: var(--color-primary);
+}
+
+.btn-primary:hover, .btn-primary:focus {
+  background-color: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary);
+  color: var(--color-text-inverse);
+  border-color: var(--color-secondary);
+}
+
+.btn-secondary:hover, .btn-secondary:focus {
+  background-color: var(--color-secondary-dark);
+  border-color: var(--color-secondary-dark);
+}
+
+.btn-success {
+  background-color: var(--color-success);
+  color: var(--color-text-inverse);
+  border-color: var(--color-success);
+}
+
+.btn-success:hover, .btn-success:focus {
+  background-color: #218838;
+  border-color: #1e7e34;
+}
+
+.btn-danger {
+  background-color: var(--color-danger);
+  color: var(--color-text-inverse);
+  border-color: var(--color-danger);
+}
+
+.btn-danger:hover, .btn-danger:focus {
+  background-color: #c82333;
+  border-color: #bd2130;
+}
+
+.btn-warning {
+  background-color: var(--color-warning);
+  color: #212529;
+  border-color: var(--color-warning);
+}
+
+.btn-warning:hover, .btn-warning:focus {
+  background-color: #e0a800;
+  border-color: #d39e00;
+}
+
+.btn-info {
+  background-color: var(--color-info);
+  color: var(--color-text-inverse);
+  border-color: var(--color-info);
+}
+
+.btn-info:hover, .btn-info:focus {
+  background-color: #0069d9;
+  border-color: #0062cc;
+}
+
+/* Outline buttons */
+.btn-outline-primary {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background-color: transparent;
+}
+
+.btn-outline-primary:hover, .btn-outline-primary:focus {
+  color: var(--color-text-inverse);
+  background-color: var(--color-primary);
+}
+
+.btn-outline-secondary {
+  color: var(--color-secondary);
+  border-color: var(--color-secondary);
+  background-color: transparent;
+}
+
+.btn-outline-secondary:hover, .btn-outline-secondary:focus {
+  color: var(--color-text-inverse);
+  background-color: var(--color-secondary);
+}
+
+/* Link buttons */
+.btn-link {
+  font-weight: var(--font-weight-normal);
+  color: var(--color-text-link);
+  background-color: transparent;
+  border: none;
+  padding: var(--space-xxs) var(--space-xs);
+}
+
+.btn-link:hover, .btn-link:focus {
+  color: #0056b3;
+  text-decoration: underline;
+  background-color: transparent;
+  border-color: transparent;
+}
+
+/* Button groups */
+.btn-group {
+  display: inline-flex;
+  position: relative;
+  vertical-align: middle;
+}
+
+.btn-group > .btn {
+  position: relative;
+  flex: 1 1 auto;
+}
+
+.btn-group > .btn:not(:first-child) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.btn-group > .btn:not(:last-child) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: none;
+}
+
+/* Action buttons for tables and cards */
+.btn-action {
+  padding: var(--space-xxs) var(--space-xs);
+  font-size: var(--font-size-sm);
+  margin-right: var(--space-xxs);
+}
+
+/* Button with icon */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon svg, .btn-icon img {
+  margin-right: var(--space-xxs);
+}
+
+/* Full width button */
+.btn-block {
+  display: block;
+  width: 100%;
+}
+
+/* Spacing between block buttons */
+.btn-block + .btn-block {
+  margin-top: var(--space-sm);
+}

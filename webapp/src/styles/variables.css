@@ -1,0 +1,127 @@
+/**
+ * GeoFinance CSS Variables
+ * 
+ * This file contains all global CSS variables used throughout the application,
+ * including colors, spacing, typography, shadows, and other design tokens.
+ */
+
+:root {
+  /* Brand colors */
+  --color-primary: #42b983;
+  --color-primary-light: #5ec799;
+  --color-primary-dark: #3aa876;
+  --color-secondary: #6c757d;
+  --color-secondary-light: #868e96;
+  --color-secondary-dark: #5a6268;
+
+  /* State colors */
+  --color-success: #28a745;
+  --color-info: #4285f4;
+  --color-warning: #f0ad4e;
+  --color-danger: #dc3545;
+
+  /* UI colors */
+  --color-background: #ffffff;
+  --color-background-alt: #f5f5f5;
+  --color-surface: #ffffff;
+  --color-border: #ddd;
+  --color-border-light: #eee;
+  --color-border-dark: #ccc;
+  --color-shadow: rgba(0, 0, 0, 0.1);
+
+  /* Text colors */
+  --color-text: #2c3e50;
+  --color-text-secondary: #666;
+  --color-text-tertiary: #999;
+  --color-text-inverse: #ffffff;
+  --color-text-link: var(--color-primary);
+
+  /* Accounting specific colors */
+  --color-positive: var(--color-success);
+  --color-negative: var(--color-danger);
+  
+  /* Spacing - used for margins, padding, gaps */
+  --space-xxs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-xxl: 48px;
+  
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+  
+  /* Typography */
+  --font-family-base: 'Avenir', Helvetica, Arial, sans-serif;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 600;
+  --font-weight-extra-bold: 700;
+  
+  /* Font sizes */
+  --font-size-xs: 0.75rem;   /* 12px */
+  --font-size-sm: 0.875rem;  /* 14px */
+  --font-size-base: 1rem;    /* 16px */
+  --font-size-md: 1.125rem;  /* 18px */
+  --font-size-lg: 1.25rem;   /* 20px */
+  --font-size-xl: 1.5rem;    /* 24px */
+  --font-size-xxl: 2rem;     /* 32px */
+  
+  /* Line heights */
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+  
+  /* Box shadows */
+  --shadow-sm: 0 1px 3px var(--color-shadow);
+  --shadow-md: 0 4px 6px var(--color-shadow);
+  --shadow-lg: 0 10px 15px -3px var(--color-shadow);
+  
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 300ms ease;
+  --transition-slow: 500ms ease;
+  
+  /* Z-index layers */
+  --z-index-dropdown: 1000;
+  --z-index-sticky: 1020;
+  --z-index-fixed: 1030;
+  --z-index-modal-backdrop: 1040;
+  --z-index-modal: 1050;
+  --z-index-popover: 1060;
+  --z-index-tooltip: 1070;
+  
+  /* Layout */
+  --max-width-content: 1200px;
+  --sidebar-width: 250px;
+  --header-height: 60px;
+  
+  /* Tables */
+  --table-header-bg: var(--color-background-alt);
+  --table-border-color: var(--color-border);
+  --table-row-hover: rgba(0, 0, 0, 0.03);
+  
+  /* Forms */
+  --input-height: 38px;
+  --input-border: var(--color-border);
+  --input-radius: var(--radius-sm);
+  --input-padding: 0 var(--space-sm);
+  --input-focus-color: var(--color-primary-light);
+  
+  /* Buttons */
+  --button-radius: var(--radius-sm);
+}
+
+/* Dark theme can be added later if needed */
+.dark-theme {
+  /* Example dark mode variables - can be expanded later */
+  --color-background: #121212;
+  --color-surface: #1e1e1e;
+  --color-text: #e0e0e0;
+  --color-border: #333333;
+  --table-header-bg: #2a2a2a;
+}

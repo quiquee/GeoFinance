@@ -1,88 +1,100 @@
 <template>
-  <div class="accounts">
-    <h1>Chart of Accounts</h1>
-    <div class="accounts-controls">
-      <button @click="toggleCreateAccountModal" class="btn-primary">Create New Account</button>
+  <div class="page-container">
+    <div class="page-header">
+      <h1 class="page-title">Chart of Accounts</h1>
+    </div>
+    <div class="d-flex justify-content-between mb-4">
+      <button @click="toggleCreateAccountModal" class="btn btn-primary">Create New Account</button>
       <div class="search-box">
-        <input type="text" v-model="searchTerm" placeholder="Search accounts..." />
+        <input type="text" v-model="searchTerm" placeholder="Search accounts..." class="form-control" />
       </div>
     </div>
     
-    <!-- Create Account Modal -->
-    <div v-if="showCreateAccountModal" class="modal">
-      <div class="modal-content">
-        <h2>Create New Account</h2>
-        <form @submit.prevent="createAccount">
-          <div class="form-group">
-            <label for="accountNumber">Account Number:</label>
-            <input type="text" id="accountNumber" v-model="newAccount.number" required class="form-control" />
-          </div>
-          
-          <div class="form-group">
-            <label for="accountName">Account Name:</label>
-            <input type="text" id="accountName" v-model="newAccount.name" required class="form-control" />
-          </div>
-          
-          <div class="form-group">
-            <label for="accountType">Account Type:</label>
-            <select id="accountType" v-model="newAccount.type" required class="form-control">
-              <option value="asset">Asset</option>
-              <option value="liability">Liability</option>
-              <option value="income">Income</option>
-              <option value="expense">Expense</option>
-              <option value="equity">Equity</option>
-            </select>
-          </div>
-          
-          <div class="button-container">
-            <button type="submit" class="btn-primary">Create Account</button>
-            <button type="button" @click="toggleCreateAccountModal" class="btn-secondary">Cancel</button>
-          </div>
-        </form>
-      </div>
+    <!-- Using ModalForm component instead of custom modal -->
+    <ModalForm
+      :show="showCreateAccountModal"
+      title="Create New Account"
+      confirmText="Create Account"
+      @confirm="createAccount"
+      @cancel="toggleCreateAccountModal"
+    >
+      <form @submit.prevent="createAccount">
+        <div class="form-group">
+          <label for="accountNumber" class="form-label">Account Number:</label>
+          <input type="text" id="accountNumber" v-model="newAccount.number" required class="form-control" />
+        </div>
+        
+        <div class="form-group">
+          <label for="accountName" class="form-label">Account Name:</label>
+          <input type="text" id="accountName" v-model="newAccount.name" required class="form-control" />
+        </div>
+        
+        <div class="form-group">
+          <label for="accountType" class="form-label">Account Type:</label>
+          <select id="accountType" v-model="newAccount.type" required class="form-control">
+            <option value="asset">Asset</option>
+            <option value="liability">Liability</option>
+            <option value="income">Income</option>
+            <option value="expense">Expense</option>
+            <option value="equity">Equity</option>
+          </select>
+        </div>
+      </form>
+    </ModalForm>
+    
+    <LoadingIndicator v-if="loading" message="Loading accounts..." />
+    
+    <ErrorMessage
+      v-else-if="error"
+      :message="error"
+      :retry="true"
+      @retry="fetchAccounts"
+    />
+    
+    <div v-else class="table-wrapper">
+      <BaseTable
+        :columns="columns"
+        :items="filteredAccounts"
+        :hasActions="true"
+      >
+        <template #actions="{ item }">
+          <button @click="viewAccountDetails(item)" class="btn btn-primary btn-sm">View</button>
+          <button @click="editAccount(item)" class="btn btn-warning btn-sm">Edit</button>
+          <button @click="confirmDelete(item)" class="btn btn-secondary btn-sm">Delete</button>
+        </template>
+      </BaseTable>
     </div>
     
-    <div v-if="loading" class="loading">
-      <p>Loading accounts...</p>
-    </div>
-    
-    <div v-else-if="error" class="error">
-      <p>{{ error }}</p>
-      <button @click="fetchAccounts" class="btn-primary">Retry</button>
-    </div>
-    
-    <div v-else class="accounts-container">
-      <table class="accounts-table">
-        <thead>
-          <tr>
-            <th>Account Number</th>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="account in filteredAccounts" :key="account.id">
-            <td>{{ account.number }}</td>
-            <td>{{ account.name }}</td>
-            <td>{{ account.type }}</td>
-            <td class="actions">
-              <button @click="viewAccountDetails(account)" class="btn-small">View</button>
-              <button @click="editAccount(account)" class="btn-small btn-edit">Edit</button>
-              <button @click="deleteAccount(account)" class="btn-small btn-secondary">Delete</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <ConfirmDialog
+      :show="showConfirmDialog"
+      title="Confirm Delete"
+      :message="confirmMessage"
+      confirmText="Delete"
+      :danger="true"
+      @confirm="deleteAccount"
+      @cancel="cancelDelete"
+    />
   </div>
 </template>
 
 <script>
 import { get, post, del } from '../services/apiService';
+import { formatCurrency } from '../services/formatters';
+import BaseTable from '../components/BaseTable.vue';
+import LoadingIndicator from '../components/LoadingIndicator.vue';
+import ErrorMessage from '../components/ErrorMessage.vue';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
+import ModalForm from '../components/ModalForm.vue';
 
 export default {
   name: 'AccountsView',
+  components: {
+    BaseTable,
+    LoadingIndicator,
+    ErrorMessage,
+    ConfirmDialog,
+    ModalForm
+  },
   data() {
     return {
       accounts: [],
@@ -94,7 +106,15 @@ export default {
         name: '',
         number: '',
         type: 'asset'
-      }
+      },
+      showConfirmDialog: false,
+      accountToDelete: null,
+      confirmMessage: '',
+      columns: [
+        { key: 'number', label: 'Account Number' },
+        { key: 'name', label: 'Name' },
+        { key: 'type', label: 'Type' }
+      ]
     }
   },
   computed: {
@@ -140,34 +160,40 @@ export default {
     async createAccount() {
       try {
         await post('api/ledger/accounts', this.newAccount);
-        this.toggleCreateAccountModal();
+        this.showCreateAccountModal = false; // Close modal on success
         this.fetchAccounts();
       } catch (err) {
         console.error('Error creating account:', err);
-        alert(`Failed to create account: ${err.response?.data?.message || err.message}`);
+        this.error = `Failed to create account: ${err.response?.data?.message || err.message}`;
       }
     },
 
-    async deleteAccount(account) {
-      if(!confirm(`Are you sure you want to delete account ${account.number} - ${account.name}?`)) {
-        return;
-      }
-      
+    confirmDelete(account) {
+      this.accountToDelete = account;
+      this.confirmMessage = `Are you sure you want to delete account ${account.number} - ${account.name}?`;
+      this.showConfirmDialog = true;
+    },
+    
+    cancelDelete() {
+      this.showConfirmDialog = false;
+      this.accountToDelete = null;
+    },
+
+    async deleteAccount() {
       try {
-        await del(`api/ledger/accounts/${account.id}`);
+        await del(`api/ledger/accounts/${this.accountToDelete.id}`);
         this.fetchAccounts();
       } catch (err) {
         console.error('Error deleting account:', err);
-        alert(`Failed to delete account: ${err.response?.data?.message || err.message}`);
+        this.error = `Failed to delete account: ${err.response?.data?.message || err.message}`;
+      } finally {
+        this.showConfirmDialog = false;
+        this.accountToDelete = null;
       }
     },
 
-    formatCurrency(value) {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD'
-      }).format(value);
-    },
+    formatCurrency,
+    
     viewAccountDetails(account) {
       alert(`View details for account: ${account.name}`);
     },
@@ -183,133 +209,8 @@ export default {
 </script>
 
 <style scoped>
-.accounts {
-  padding: 20px;
-}
-
-.accounts-controls {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.search-box input {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+/* Component-specific styling */
+.search-box {
   width: 250px;
-}
-
-.accounts-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 20px;
-}
-
-.accounts-table th,
-.accounts-table td {
-  padding: 12px;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
-}
-
-.accounts-table th {
-  background-color: #f5f5f5;
-}
-
-.accounts-table tr:hover {
-  background-color: #f9f9f9;
-}
-
-.btn-primary {
-  background-color: #42b983;
-  color: white;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.btn-small {
-  padding: 5px 10px;
-  background-color: #42b983;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-right: 5px;
-}
-
-.btn-edit {
-  background-color: #f0ad4e;
-}
-
-.btn-secondary {
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  padding: 5px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.loading, .error {
-  text-align: center;
-  padding: 30px;
-}
-
-.error {
-  color: #dc3545;
-}
-
-.actions {
-  white-space: nowrap;
-}
-
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background-color: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  width: 500px;
-  max-width: 90%;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.form-group {
-  margin-bottom: 15px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: bold;
-}
-
-.form-control {
-  width: 100%;
-  padding: 8px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-sizing: border-box;
-}
-
-.button-container {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 20px;
 }
 </style>

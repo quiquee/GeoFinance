@@ -1,0 +1,110 @@
+/**
+ * GeoFinance Main Stylesheet
+ * 
+ * This is the main entry point for all styles.
+ * Import this file in your main app to apply all styles.
+ */
+
+/* First import variables for use in all other files */
+@import './variables.css';
+
+/* Base styles and layout */
+@import './layout.css';
+
+/* Component styles */
+@import './buttons.css';
+@import './forms.css';
+@import './tables.css';
+
+/**
+ * Global Styles
+ */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--color-text);
+  background-color: var(--color-background);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography styles */
+h1, h2, h3, h4, h5, h6 {
+  margin-bottom: var(--space-sm);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  color: var(--color-text);
+}
+
+h1 { font-size: var(--font-size-xxl); }
+h2 { font-size: var(--font-size-xl); }
+h3 { font-size: var(--font-size-lg); }
+h4 { font-size: var(--font-size-md); }
+h5 { font-size: var(--font-size-base); }
+h6 { font-size: var(--font-size-sm); }
+
+p {
+  margin-bottom: var(--space-md);
+}
+
+a {
+  color: var(--color-text-link);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* Utility classes */
+.text-primary { color: var(--color-primary); }
+.text-secondary { color: var(--color-secondary); }
+.text-success { color: var(--color-success); }
+.text-danger { color: var(--color-danger); }
+.text-warning { color: var(--color-warning); }
+.text-info { color: var(--color-info); }
+
+.bg-primary { background-color: var(--color-primary); }
+.bg-secondary { background-color: var(--color-secondary); }
+.bg-success { background-color: var(--color-success); }
+.bg-danger { background-color: var(--color-danger); }
+.bg-warning { background-color: var(--color-warning); }
+.bg-info { background-color: var(--color-info); }
+
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+
+.font-bold { font-weight: var(--font-weight-bold); }
+.font-normal { font-weight: var(--font-weight-normal); }
+
+/* Display utilities */
+.d-none { display: none; }
+.d-block { display: block; }
+.d-inline { display: inline; }
+.d-inline-block { display: inline-block; }
+.d-flex { display: flex; }
+.d-grid { display: grid; }
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+  .d-sm-none { display: none; }
+  .d-sm-block { display: block; }
+  .d-sm-flex { display: flex; }
+}
+
+@media (min-width: 769px) {
+  .d-md-none { display: none; }
+  .d-md-block { display: block; }
+  .d-md-flex { display: flex; }
+}

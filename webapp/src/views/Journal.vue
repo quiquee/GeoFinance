@@ -1,6 +1,8 @@
 <template>
-  <div class="journal">
-    <h1>Journal Entries</h1>
+  <div class="page-container">
+    <div class="page-header">
+      <h1 class="page-title">Journal Entries</h1>
+    </div>
 
     <div v-if="showCreateForm">
       <CreateJournalEntry
@@ -11,94 +13,116 @@
     </div>
 
     <div v-else>
-      <div class="journal-controls">
-        <button @click="toggleCreateForm" class="btn-primary">Create New Journal Entry</button>
-        <div class="filters">
-          <input type="date" v-model="startDate" class="date-input" />
-          <input type="date" v-model="endDate" class="date-input" />
-          <button @click="applyDateFilter" class="btn-filter">Filter by Date</button>
-        </div>
+      <div class="d-flex justify-content-between align-items-center flex-wrap mb-4 gap-controls">
+        <button @click="toggleCreateForm" class="btn btn-primary">Create New Journal Entry</button>
+        
+        <DateRangePicker
+          v-model:startDate="startDate"
+          v-model:endDate="endDate"
+          @apply="fetchJournalEntries"
+          :showPresets="true"
+          applyButtonText="Filter Entries"
+        />
       </div>
 
-      <div v-if="loading" class="loading">
-        <p>Loading journal entries...</p>
-      </div>
-
-      <div v-else-if="error" class="error">
-        <p>{{ error }}</p>
-        <button @click="fetchJournalEntries" class="btn-primary">Retry</button>
-      </div>
+      <LoadingIndicator v-if="loading" message="Loading journal entries..." />
+      
+      <ErrorMessage
+        v-else-if="error"
+        :message="error"
+        :retry="true"
+        @retry="fetchJournalEntries"
+      />
 
       <div v-else>
-        <div v-if="journalEntries.length === 0" class="no-entries">
-          <p>No journal entries found.</p>
-        </div>
-
-        <div v-else class="journal-entries-list">
-          <div class="journal-entries-header">
-            <span class="col-id">Entry #</span>
-            <span class="col-date">Date</span>
-            <span class="col-desc">Description</span>
-            <span class="col-total">Total Amount</span>
-            <span class="col-actions">Actions</span>
-          </div>
-          
-          <div 
-            v-for="entry in journalEntries" 
-            :key="entry.id" 
-            class="journal-entry-row"
-            @mouseover="hoveredEntry = entry.id"
-            @mouseleave="hoveredEntry = null"
+        <div class="table-responsive">
+          <BaseTable
+            v-if="journalEntries.length > 0"
+            :columns="columns"
+            :items="journalEntries"
+            :hasActions="true"
           >
-            <span class="col-id">{{ entry.id }}</span>
-            <span class="col-date">{{ formatDate(entry.date) }}</span>
-            <span class="col-desc">{{ entry.description }}</span>
-            <span class="col-total">{{ formatCurrency(calculateEntryTotal(entry)) }}</span>
-            <span class="col-actions">
-              <button @click="viewEntryDetails(entry)" class="btn-small">View</button>
-              <button @click="editEntry(entry)" class="btn-small btn-edit">Edit</button>
-              <button @click="deleteEntry(entry.id)" class="btn-small btn-delete">Delete</button>
-            </span>
+            <template #cell-date="{ value }">
+              {{ formatDate(value) }}
+            </template>
             
-            <!-- Detailed view that appears on hover -->
-            <div v-if="hoveredEntry === entry.id" class="entry-details-popup">
-              <div class="popup-header">
-                <h4>Entry #{{ entry.id }} - {{ formatDate(entry.date) }}</h4>
-                <div>{{ entry.description }}</div>
+            <template #cell-total="{ item }">
+              {{ formatCurrency(calculateEntryTotal(item)) }}
+            </template>
+            
+            <template #actions="{ item }">
+              <button @click="viewEntryDetails(item)" class="btn btn-primary btn-sm">View</button>
+              <button @click="editEntry(item)" class="btn btn-warning btn-sm">Edit</button>
+              <button @click="confirmDelete(item.id)" class="btn btn-danger btn-sm">Delete</button>
+            </template>
+            
+            <template #no-data>
+              <div class="text-center py-4 text-secondary">
+                <p>No journal entries found.</p>
               </div>
-              
-              <table class="entry-details-table">
-                <thead>
-                  <tr>
-                    <th>Account</th>
-                    <th>Debit</th>
-                    <th>Credit</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="(line, index) in processEntryLines(entry.lines)" :key="index">
-                    <td>{{ line.account_name }}</td>
-                    <td>{{ line.debit ? formatCurrency(line.debit) : '' }}</td>
-                    <td>{{ line.credit ? formatCurrency(line.credit) : '' }}</td>
-                  </tr>
-                </tbody>
-              </table>
+            </template>
+          </BaseTable>
+        </div>
+        
+        <!-- Detailed view that appears on hover - could be moved to a separate component -->
+        <div v-for="entry in journalEntries" :key="`detail-${entry.id}`">
+          <div v-if="hoveredEntry === entry.id" class="entry-details-popup">
+            <div class="card-header">
+              <h4 class="card-title">Entry #{{ entry.id }} - {{ formatDate(entry.date) }}</h4>
+              <div>{{ entry.description }}</div>
+            </div>
+            
+            <div class="card-body">
+              <BaseTable
+                :columns="detailColumns"
+                :items="processEntryLines(entry.lines)"
+                :hasActions="false"
+                class="table table-striped"
+              >
+                <template #cell-debit="{ value }">
+                  {{ value ? formatCurrency(value) : '' }}
+                </template>
+                <template #cell-credit="{ value }">
+                  {{ value ? formatCurrency(value) : '' }}
+                </template>
+              </BaseTable>
             </div>
           </div>
         </div>
       </div>
     </div>
+    
+    <ConfirmDialog
+      :show="showConfirmDialog"
+      title="Confirm Delete"
+      :message="confirmMessage"
+      confirmText="Delete"
+      :danger="true"
+      @confirm="deleteEntry"
+      @cancel="cancelDelete"
+    />
   </div>
 </template>
 
 <script>
 import CreateJournalEntry from './CreateJournalEntry.vue';
+import DateRangePicker from '../components/DateRangePicker.vue';
+import LoadingIndicator from '../components/LoadingIndicator.vue';
+import ErrorMessage from '../components/ErrorMessage.vue';
+import BaseTable from '../components/BaseTable.vue';
+import ConfirmDialog from '../components/ConfirmDialog.vue';
 import { get, del } from '../services/apiService';
+import { formatCurrency, formatDate } from '../services/formatters';
 
 export default {
   name: 'JournalView',
   components: {
     CreateJournalEntry,
+    DateRangePicker,
+    LoadingIndicator,
+    ErrorMessage,
+    BaseTable,
+    ConfirmDialog
   },
   data() {
     return {
@@ -110,6 +134,20 @@ export default {
       showCreateForm: false,
       accounts: [],
       hoveredEntry: null,
+      showConfirmDialog: false,
+      entryToDelete: null,
+      confirmMessage: '',
+      columns: [
+        { key: 'id', label: 'Entry #' },
+        { key: 'date', label: 'Date' },
+        { key: 'description', label: 'Description' },
+        { key: 'total', label: 'Total Amount', format: 'currency' }
+      ],
+      detailColumns: [
+        { key: 'account_name', label: 'Account' },
+        { key: 'debit', label: 'Debit' },
+        { key: 'credit', label: 'Credit' }
+      ]
     };
   },
   methods: {
@@ -151,17 +189,27 @@ export default {
       }
     },
     
-    async deleteEntry(entryId) {
-      if (!confirm('Are you sure you want to delete this journal entry?')) {
-        return;
-      }
-      
+    confirmDelete(entryId) {
+      this.entryToDelete = entryId;
+      this.confirmMessage = `Are you sure you want to delete journal entry #${entryId}?`;
+      this.showConfirmDialog = true;
+    },
+    
+    cancelDelete() {
+      this.showConfirmDialog = false;
+      this.entryToDelete = null;
+    },
+    
+    async deleteEntry() {
       try {
-        await del(`api/ledger/journal/entries/${entryId}`);
+        await del(`api/ledger/journal/entries/${this.entryToDelete}`);
         this.fetchJournalEntries();
       } catch (err) {
         console.error('Error deleting journal entry:', err);
-        alert(`Failed to delete entry: ${err.message}`);
+        this.error = `Failed to delete entry: ${err.message}`;
+      } finally {
+        this.showConfirmDialog = false;
+        this.entryToDelete = null;
       }
     },
     
@@ -177,30 +225,13 @@ export default {
         };
       });
     },
-    applyDateFilter() {
-      if (!this.startDate || !this.endDate) {
-        alert('Please select both start and end dates');
-        return;
-      }
-      this.fetchJournalEntries();
-    },
-    formatDate(dateString) {
-      const date = new Date(dateString);
-      return new Intl.DateTimeFormat('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      }).format(date);
-    },
-    formatCurrency(value) {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD'
-      }).format(value);
-    },
+    
+    formatDate,
+    formatCurrency,
+    
     viewEntryDetails(entry) {
-      // This function will be implemented later
-      alert(`View details for entry #${entry.id}`);
+      // Toggle hover state to show detail view
+      this.hoveredEntry = this.hoveredEntry === entry.id ? null : entry.id;
     },
     editEntry(entry) {
       // This function will be implemented later
@@ -231,161 +262,22 @@ export default {
 </script>
 
 <style scoped>
-.journal {
-  padding: 20px;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-.journal-controls {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.filters {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.date-input {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-}
-
-.btn-primary, .btn-filter {
-  background-color: #42b983;
-  color: white;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.btn-filter {
-  background-color: #4285f4;
-}
-
-.btn-small {
-  padding: 5px 10px;
-  background-color: #42b983;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  margin-right: 5px;
-}
-
-.btn-edit {
-  background-color: #f0ad4e;
-}
-
-.btn-delete {
-  background-color: #dc3545;
-}
-
-.journal-entries-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
-}
-
-.journal-entries-header {
-  display: flex;
-  justify-content: space-between;
-  font-weight: bold;
-  padding: 10px;
-  background-color: #f1f1f1;
-  border-radius: 4px;
-  width: 100%;
-}
-
-.journal-entry-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background-color: #fff;
-  position: relative;
-  width: 100%;
-}
-
-.journal-entry-row:hover {
-  background-color: #f9f9f9;
-}
-
-.col-id {
-  flex: 0 0 10%;
-  text-align: center;
-}
-
-.col-date {
-  flex: 0 0 20%;
-  text-align: center;
-}
-
-.col-desc {
-  flex: 0 0 30%;
-  text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 0 10px;
-}
-
-.col-total {
-  flex: 0 0 20%;
-  text-align: right;
-}
-
-.col-actions {
-  flex: 0 0 20%;
-  text-align: center;
-  display: flex;
-  justify-content: center;
-  gap: 5px;
+/* Component-specific styles */
+.gap-controls {
+  gap: 15px;
 }
 
 .entry-details-popup {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  width: 100%;
-  background-color: #fff;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  z-index: 10;
-}
-
-.popup-header {
-  margin-bottom: 10px;
-}
-
-.entry-details-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.entry-details-table th, .entry-details-table td {
-  padding: 8px;
-  text-align: left;
-  border-bottom: 1px solid #ddd;
-}
-
-.loading, .error, .no-entries {
-  text-align: center;
-  padding: 30px;
-}
-
-.error {
-  color: #dc3545;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 800px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  z-index: var(--z-index-modal);
+  box-shadow: var(--shadow-md);
 }
 </style>
